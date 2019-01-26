@@ -1,0 +1,8 @@
+[package]
+name = "ddex"
+version = "0.1.0"
+authors = ["Cody Shepp <me@codyshepp.com>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "1"
