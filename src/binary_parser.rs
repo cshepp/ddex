@@ -1,4 +1,5 @@
 
+use crate::util::{decode_uleb128, to_hex_string, to_binary_string};
 
 pub struct BinaryParser {
     buffer: Vec<u8>,
@@ -75,5 +76,22 @@ impl BinaryParser {
 
     pub fn is_it_the_end(&mut self) -> bool {
         self.next == self.buffer.len()
+    }
+
+    pub fn parse_uleb128(&mut self) -> u32 {
+        let mut result: Vec<u8> = Vec::new();
+
+        loop {
+            let x = self.next();
+            result.push(x);
+            if x & 0x80 == 0 {
+                break;
+            }
+        }
+
+        result.reverse();
+        let uint = decode_uleb128(&result);
+        //println!(">>>>>>>> Parsing uLEB128: {} -> {} -> {}", to_hex_string(&result), to_binary_string(&result), uint);
+        return uint;
     }
 }
