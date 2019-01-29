@@ -1,5 +1,5 @@
 use crate::binary_parser::BinaryParser;
-use crate::util::{to_decimal, to_decimal_short, to_ascii, print_hex};
+use crate::util::{to_decimal, to_decimal_short, to_ascii, to_utf8, print_hex, to_hex_string};
 
 pub struct DexParser {
     parser: BinaryParser,
@@ -124,22 +124,13 @@ impl DexParser {
             let start_addr = to_decimal(start_hex) as usize;
 
             self.parser.seek_to(start_addr as usize);
-            self.parser.drop(1); // not quite correct... should instead read the size of the UTF16 string (should be a u32 in uleb128 format)
-            // let mut e = self.parser.take_while(Box::new(|i: u8| {
-            //     i & 0b0000_0001 == 1
-            // }));
-            // e.append(&mut self.parser.take(1));
+            let length = self.parser.parse_uleb128();
 
             let s = self.parser.take_until(0x00);
             self.parser.expect(0x00);
 
-            // print_hex(&e);
-            // let len = to_ascii(&s).len();
-            // println!("{}, {}", decode_uleb128(&e), len);
-            // if len as u32 != decode_uleb128(&e) {
-            //     //panic!("");
-            // }
-            result.push(to_ascii(&s));
+            let actual_string = to_utf8(&s);
+            result.push(actual_string);
         }
 
         self.strings = result;
@@ -341,8 +332,14 @@ impl DexParser {
                 self.strings[source_file_idx as usize].clone()
             };
 
-            println!("{:?} ------------------------------------------", class_type.parsed);
-            println!("{:01$x}", addr, 2);
+            // println!("{:?} ------------------------------------------", class_type.parsed);
+            // println!("  {:?}", superclass_type.parsed);
+            // println!("  ADDR: {:01$x}", addr, 2);
+
+            if class_data_offset == 0 {
+                //println!("No class data");
+                continue;
+            }
 
             // parse class data
             self.parser.seek_to(class_data_offset as usize);
@@ -351,7 +348,7 @@ impl DexParser {
             let direct_methods_size = self.parser.parse_uleb128();
             let virtual_methods_size = self.parser.parse_uleb128();
 
-            println!("Parsing {} static fields", static_fields_size);
+            //println!("  Parsing {} static fields", static_fields_size);
             let mut last_static_field_idx: Option<u32> = None;
             for _ in 0..static_fields_size {
                 let field_idx_diff = self.parser.parse_uleb128();
@@ -362,11 +359,11 @@ impl DexParser {
                 let access_flags = self.parser.parse_uleb128();
                 
                 let field = self.fields[field_idx as usize].clone();
-                //println!("{:?} {}", field, access_flags);
+                //println!("    {:?} {}", field, access_flags);
                 last_static_field_idx = Some(field_idx);
             }
 
-            println!("Parsing {} instance fields", instance_fields_size);
+            // println!("  Parsing {} instance fields", instance_fields_size);
             let mut last_instance_field_idx: Option<u32> = None;
             for _ in 0..instance_fields_size {
                 let field_idx_diff = self.parser.parse_uleb128();
@@ -377,11 +374,11 @@ impl DexParser {
                 let access_flags = self.parser.parse_uleb128();
                 
                 let field = self.fields[field_idx as usize].clone();
-                //println!("{:?} {}", field, access_flags);
+                // println!("    {:?} {}", field, access_flags);
                 last_instance_field_idx = Some(field_idx);
             }
 
-            println!("Parsing {} direct methods", direct_methods_size);
+            // println!("  Parsing {} direct methods", direct_methods_size);
             let mut last_direct_method_idx: Option<u32> = None;
             for _ in 0..direct_methods_size {
                 let method_idx_diff = self.parser.parse_uleb128();
@@ -391,23 +388,23 @@ impl DexParser {
                 };
 
                 if method_idx_diff == 0 {
-                    println!("Method idx diff is 0 -------------------------------------------------------------- :(");
+                    //println!("Method idx diff is 0 -------------------------------------------------------------- :(");
                 }
 
                 let access_flags = self.parser.parse_uleb128();
                 let code_offset = self.parser.parse_uleb128();
 
                 let method = self.methods[method_idx as usize].clone();
-                println!("{:?}, {}, {}", method, access_flags, code_offset);
+                // println!("    {}, {}, {}", method.method_name, access_flags, code_offset);
 
                 last_direct_method_idx = Some(method_idx);
             }
 
-            // for _ in 0..virtual_methods_size {
-            //     let method_idx_diff = self.parser.parse_uleb128();
-            //     let access_flags = self.parser.parse_uleb128();
-            //     let code_offset = self.parser.parse_uleb128();
-            // }
+            for _ in 0..virtual_methods_size {
+                let method_idx_diff = self.parser.parse_uleb128();
+                let access_flags = self.parser.parse_uleb128();
+                let code_offset = self.parser.parse_uleb128();
+            }
 
             let def = DexClassDef {
                 address: addr,
@@ -554,4 +551,49 @@ pub struct DexClassDef {
     pub class_type: DexType,
     pub superclass_type: DexType,
     pub source_file: String,
+}
+
+#[derive(Debug)]
+pub enum ClassAccessLevel {
+    Public     = 0x1,
+    Private    = 0x2,
+    Protected  = 0x4,
+    Static     = 0x8,
+    Final      = 0x10,
+    Interface  = 0x200,
+    Abstract   = 0x400,
+    Synthetic  = 0x1000,
+    Annotation = 0x2000,
+    Enum       = 0x4000,
+}
+
+#[derive(Debug)]
+pub enum FieldAccessLevel {
+    Public    = 0x1,
+    Private   = 0x2,
+    Protected = 0x4,
+    Static    = 0x8,
+    Final     = 0x10,
+    Volatile  = 0x40,
+    Transient = 0x80,
+    Synthetic = 0x1000,
+    Enum      = 0x4000,
+}
+
+#[derive(Debug)]
+pub enum MethodAccessLevel {
+    Public               = 0x1,
+    Private              = 0x2,
+    Protected            = 0x4,
+    Static               = 0x8,
+    Final                = 0x10,
+    Synchronized         = 0x20,
+    Bridge               = 0x40,
+    VarArgs              = 0x80,
+    Native               = 0x100,
+    Abstract             = 0x400,
+    Strict               = 0x800,
+    Synthetic            = 0x1000,
+    Constructor          = 0x10000,
+    DeclaredSynchronized = 0x20000,
 }

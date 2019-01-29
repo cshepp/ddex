@@ -18,7 +18,7 @@ fn main() {
     let mut dex_parser = DexParser::new(buf);
     dex_parser.parse();
 
-    for c in dex_parser.methods {
-        //println!("{:?}", c);
-    }
+    // for c in dex_parser.strings {
+    //     println!("{:?}", c);
+    // }
 }

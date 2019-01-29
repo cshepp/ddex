@@ -48,7 +48,6 @@ impl BinaryParser {
 
     pub fn take_until(&mut self, x: u8) -> Vec<u8> {
         let mut acc = Vec::new();
-        let mut i = 0;
         loop {
             let p = self.peek(1)[0];
             if p == x {
@@ -89,7 +88,6 @@ impl BinaryParser {
             }
         }
 
-        result.reverse();
         let uint = decode_uleb128(&result);
         //println!(">>>>>>>> Parsing uLEB128: {} -> {} -> {}", to_hex_string(&result), to_binary_string(&result), uint);
         return uint;
