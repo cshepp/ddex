@@ -4,6 +4,7 @@ use std::env;
 
 mod util;
 mod binary_parser;
+mod dex_types;
 mod dex_parser;
 use crate::dex_parser::{DexParser};
 
@@ -18,7 +19,5 @@ fn main() {
     let mut dex_parser = DexParser::new(buf);
     dex_parser.parse();
 
-    // for c in dex_parser.strings {
-    //     println!("{:?}", c);
-    // }
+    println!("{:?}", dex_parser.header);
 }

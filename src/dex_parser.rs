@@ -1,5 +1,6 @@
 use crate::binary_parser::BinaryParser;
 use crate::util::{to_decimal, to_decimal_short, to_ascii, to_utf8, print_hex, to_hex_string};
+use crate::dex_types::*;
 
 pub struct DexParser {
     parser: BinaryParser,
@@ -37,6 +38,7 @@ impl DexParser {
     }
 }
 
+// TODO -  these methods should be converted to pure functions
 impl DexParser {
     fn parse_header(&mut self) {
         self.parser.expect_many(vec![0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x38, 0x00]);
@@ -74,9 +76,9 @@ impl DexParser {
         };
 
         let header = DexHeader {
-            dex_version: 0, // FIXME - grab actual version from dex_file_magic
-            checksum: to_decimal(&checksum), // FIXME - should this checksum be a decimal? hex?
-            sha1: to_ascii(&sha1), // FIXME - this should probably be hex instead of ASCII
+            dex_version: 0,                     // FIXME - grab actual version from dex_file_magic
+            checksum: to_decimal(&checksum),    // FIXME - should this checksum be a decimal? hex?
+            sha1: to_hex_string(&sha1).replace(" ", ""),
             file_size: to_decimal(&file_size),
             header_size: to_decimal(&header_size),
             endianness,
@@ -187,19 +189,15 @@ impl DexParser {
             let shorty_idx = to_decimal(&self.parser.take(4));
             let return_type_idx = to_decimal(&self.parser.take(4));
             let parameters_offset = to_decimal(&self.parser.take(4));
-
-            let shorty = self.strings[shorty_idx as usize].clone();
-            let return_type = self.types[return_type_idx as usize].clone();
             
-            let mut parameters: Vec<DexType> = Vec::new();
-            
-            if parameters_offset != 0 { // offset of 0 indicates no parameters
+            let mut parameter_type_idx_list: Vec<u16> = Vec::new();
+            if parameters_offset != 0 { // offset of 0 indicates no parameter_type_idx_list
                 self.parser.seek_to(parameters_offset as usize);
                 let parameter_count = to_decimal(&self.parser.take(4));
 
                 for _ in 0..parameter_count {
                     let param_idx = to_decimal_short(&self.parser.take(2));
-                    parameters.push(self.types[param_idx as usize].clone());
+                    parameter_type_idx_list.push(param_idx);
                 }
             }
 
@@ -207,9 +205,7 @@ impl DexParser {
                 shorty_idx,
                 return_type_idx,
                 parameters_offset,
-                shorty,
-                return_type,
-                parameters,
+                parameter_type_idx_list,
             };
 
             result.push(proto);
@@ -241,15 +237,10 @@ impl DexParser {
             let type_idx = to_decimal_short(&self.parser.take(2));
             let name_idx = to_decimal(&self.parser.take(4));
 
-            let field_type = self.types[type_idx as usize].clone();
-            let field_name = self.strings[name_idx as usize].clone();
-
             let field = DexField {
                 class_idx: class_idx as u32,
                 type_idx: type_idx as u32,
                 name_idx,
-                field_type,
-                field_name,
             };
 
             result.push(field);
@@ -280,15 +271,10 @@ impl DexParser {
             let proto_idx = to_decimal_short(&self.parser.take(2));
             let name_idx = to_decimal(&self.parser.take(4));
 
-            let proto = self.protos[proto_idx as usize].clone();
-            let method_name = self.strings[name_idx as usize].clone();
-
             let method = DexMethod {
                 class_idx: class_idx as u32,
                 proto_idx: proto_idx as u32,
                 name_idx,
-                proto,
-                method_name,
             };
 
             result.push(method);
@@ -315,6 +301,7 @@ impl DexParser {
                 break;
             }
 
+            // Consuming 32 bytes here
             let class_idx = to_decimal(&self.parser.take(4));
             let access_flags = to_decimal(&self.parser.take(4));
             let superclass_idx = to_decimal(&self.parser.take(4));
@@ -324,20 +311,7 @@ impl DexParser {
             let class_data_offset = to_decimal(&self.parser.take(4));
             let static_values_offset = to_decimal(&self.parser.take(4));
 
-            let class_type = self.types[class_idx as usize].clone();
-            let superclass_type = self.types[superclass_idx as usize].clone();
-            let source_file = if source_file_idx == 4294967295 { // -1 is NO_INDEX
-                "".to_string()
-            } else {
-                self.strings[source_file_idx as usize].clone()
-            };
-
-            // println!("{:?} ------------------------------------------", class_type.parsed);
-            // println!("  {:?}", superclass_type.parsed);
-            // println!("  ADDR: {:01$x}", addr, 2);
-
             if class_data_offset == 0 {
-                //println!("No class data");
                 continue;
             }
 
@@ -348,8 +322,13 @@ impl DexParser {
             let direct_methods_size = self.parser.parse_uleb128();
             let virtual_methods_size = self.parser.parse_uleb128();
 
-            //println!("  Parsing {} static fields", static_fields_size);
+            /*
+                TODO - Refactor the following two chunks into functions:
+                    1) Parse encoded fields
+                    2) Parse encoded methods
+            */
             let mut last_static_field_idx: Option<u32> = None;
+            let mut static_fields: Vec<EncodedField> = Vec::new();
             for _ in 0..static_fields_size {
                 let field_idx_diff = self.parser.parse_uleb128();
                 let field_idx = match last_static_field_idx {
@@ -357,14 +336,12 @@ impl DexParser {
                     None => field_idx_diff,
                 };
                 let access_flags = self.parser.parse_uleb128();
-                
-                let field = self.fields[field_idx as usize].clone();
-                //println!("    {:?} {}", field, access_flags);
+                static_fields.push(EncodedField{ field_idx, access_flags });
                 last_static_field_idx = Some(field_idx);
             }
 
-            // println!("  Parsing {} instance fields", instance_fields_size);
             let mut last_instance_field_idx: Option<u32> = None;
+            let mut instance_fields: Vec<EncodedField> = Vec::new();
             for _ in 0..instance_fields_size {
                 let field_idx_diff = self.parser.parse_uleb128();
                 let field_idx = match last_instance_field_idx {
@@ -372,38 +349,38 @@ impl DexParser {
                     None => field_idx_diff,
                 };
                 let access_flags = self.parser.parse_uleb128();
-                
-                let field = self.fields[field_idx as usize].clone();
-                // println!("    {:?} {}", field, access_flags);
+                instance_fields.push(EncodedField{ field_idx, access_flags });
                 last_instance_field_idx = Some(field_idx);
             }
 
-            // println!("  Parsing {} direct methods", direct_methods_size);
             let mut last_direct_method_idx: Option<u32> = None;
+            let mut direct_methods: Vec<EncodedMethod> = Vec::new();
             for _ in 0..direct_methods_size {
                 let method_idx_diff = self.parser.parse_uleb128();
                 let method_idx = match last_direct_method_idx {
                     Some(idx) => idx + method_idx_diff,
                     None => method_idx_diff,
                 };
-
-                if method_idx_diff == 0 {
-                    //println!("Method idx diff is 0 -------------------------------------------------------------- :(");
-                }
-
                 let access_flags = self.parser.parse_uleb128();
                 let code_offset = self.parser.parse_uleb128();
 
-                let method = self.methods[method_idx as usize].clone();
-                // println!("    {}, {}, {}", method.method_name, access_flags, code_offset);
-
+                direct_methods.push(EncodedMethod{ method_idx, access_flags, code_offset });
                 last_direct_method_idx = Some(method_idx);
             }
 
+            let mut last_virtual_method_idx: Option<u32> = None;
+            let mut virtual_methods: Vec<EncodedMethod> = Vec::new();
             for _ in 0..virtual_methods_size {
                 let method_idx_diff = self.parser.parse_uleb128();
+                let method_idx = match last_virtual_method_idx {
+                    Some(idx) => idx + method_idx_diff,
+                    None => method_idx_diff,
+                };
                 let access_flags = self.parser.parse_uleb128();
                 let code_offset = self.parser.parse_uleb128();
+
+                virtual_methods.push(EncodedMethod{ method_idx, access_flags, code_offset });
+                last_virtual_method_idx = Some(method_idx);
             }
 
             let def = DexClassDef {
@@ -416,12 +393,16 @@ impl DexParser {
                 annotations_offset,
                 class_data_offset,
                 static_values_offset,
-                class_type,
-                superclass_type,
-                source_file,
+                static_fields,
+                instance_fields,
+                direct_methods,
+                virtual_methods,
             };
 
             result.push(def);
+
+            // Reset the parser back into class_defs, 32 bytes after 
+            // the starting address of this def.
             self.parser.seek_to(addr + 32);
         }
 
@@ -454,146 +435,6 @@ fn parse_type_descriptor(s: String) -> TypeDescriptor {
     }
 }
 
-#[derive(Debug)]
-pub struct DexHeader {
-    pub dex_version: u8,
-    pub checksum: u32,
-    pub sha1: String,
-    pub file_size: u32,
-    pub header_size: u32,
-    pub endianness: Endianness,
-    pub link_size: u32,
-    pub link_offset: u32,
-    pub map_offset: u32,
-    pub string_ids_size: u32,
-    pub string_ids_offset: u32,
-    pub type_ids_size: u32,
-    pub type_ids_offset: u32,
-    pub proto_ids_size: u32,
-    pub proto_ids_offset: u32,
-    pub field_ids_size: u32,
-    pub field_ids_offset: u32,
-    pub method_ids_size: u32,
-    pub method_ids_offset: u32,
-    pub class_defs_size: u32,
-    pub class_defs_offset: u32,
-    pub data_size: u32,
-    pub data_offset: u32,
-}
+fn parse_encoded_fields() {}
 
-#[derive(Debug)]
-pub enum Endianness {
-    LittleEndian,
-    BigEndian,
-}
-
-#[derive(Debug, Clone)]
-pub struct DexType {
-    pub raw: String,
-    pub parsed: TypeDescriptor,
-}
-
-#[derive(Debug, Clone)]
-pub enum TypeDescriptor {
-    Void,
-    Boolean,
-    Byte,
-    Short,
-    Char,
-    Int,
-    Long,
-    Float,
-    Double,
-    Class(String),
-    Array(Box<TypeDescriptor>),
-}
-
-#[derive(Debug, Clone)]
-pub struct DexProto {
-    shorty_idx: u32,
-    return_type_idx: u32,
-    parameters_offset: u32,
-    pub shorty: String,
-    pub return_type: DexType,
-    pub parameters: Vec<DexType>,
-}
-
-#[derive(Debug, Clone)]
-pub struct DexField {
-    class_idx: u32,
-    type_idx: u32,
-    name_idx: u32,
-    field_type: DexType,
-    field_name: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct DexMethod {
-    class_idx: u32,
-    proto_idx: u32,
-    name_idx: u32,
-    proto: DexProto,
-    method_name: String,
-}
-
-#[derive(Debug)]
-pub struct DexClassDef {
-    address: usize,
-    class_idx: u32, // index into type_ids
-    access_flags: u32,
-    superclass_idx: u32, // index into type_ids
-    interfaces_offset: u32,
-    source_file_idx: u32, // index into string_ids
-    annotations_offset: u32,
-    class_data_offset: u32,
-    static_values_offset: u32,
-    //
-    pub class_type: DexType,
-    pub superclass_type: DexType,
-    pub source_file: String,
-}
-
-#[derive(Debug)]
-pub enum ClassAccessLevel {
-    Public     = 0x1,
-    Private    = 0x2,
-    Protected  = 0x4,
-    Static     = 0x8,
-    Final      = 0x10,
-    Interface  = 0x200,
-    Abstract   = 0x400,
-    Synthetic  = 0x1000,
-    Annotation = 0x2000,
-    Enum       = 0x4000,
-}
-
-#[derive(Debug)]
-pub enum FieldAccessLevel {
-    Public    = 0x1,
-    Private   = 0x2,
-    Protected = 0x4,
-    Static    = 0x8,
-    Final     = 0x10,
-    Volatile  = 0x40,
-    Transient = 0x80,
-    Synthetic = 0x1000,
-    Enum      = 0x4000,
-}
-
-#[derive(Debug)]
-pub enum MethodAccessLevel {
-    Public               = 0x1,
-    Private              = 0x2,
-    Protected            = 0x4,
-    Static               = 0x8,
-    Final                = 0x10,
-    Synchronized         = 0x20,
-    Bridge               = 0x40,
-    VarArgs              = 0x80,
-    Native               = 0x100,
-    Abstract             = 0x400,
-    Strict               = 0x800,
-    Synthetic            = 0x1000,
-    Constructor          = 0x10000,
-    DeclaredSynchronized = 0x20000,
-}
+fn parse_encoded_methods() {}
