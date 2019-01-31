@@ -1,6 +1,8 @@
 use crate::binary_parser::BinaryParser;
 use crate::util::{to_decimal, to_decimal_short, to_ascii, to_utf8, print_hex, to_hex_string};
 use crate::dex_types::*;
+use std::io::{Cursor, Read};
+use std::iter::{Iterator};
 
 pub struct DexParser {
     parser: BinaryParser,
@@ -438,3 +440,68 @@ fn parse_type_descriptor(s: String) -> TypeDescriptor {
 fn parse_encoded_fields() {}
 
 fn parse_encoded_methods() {}
+
+fn parse_header(parser: &mut BinaryParser) -> DexHeader {
+    parser.seek_to(0);
+    let dex_magic = parser.take(8);
+
+    // assert!() that dex magic makes sense
+
+    let checksum = parser.take(4);
+    let sha1 = parser.take(20);
+    let file_size = parser.take(4);
+    let header_size = parser.take(4);
+    let endian_constant = parser.take(4);
+    let link_size = parser.take(4);
+    let link_offset = parser.take(4);
+    let map_offset = parser.take(4);
+    let string_ids_size = parser.take(4);
+    let string_ids_offset = parser.take(4);
+    let type_ids_size = parser.take(4);
+    let type_ids_offset = parser.take(4);
+    let proto_ids_size = parser.take(4);
+    let proto_ids_offset = parser.take(4);
+    let field_ids_size = parser.take(4);
+    let field_ids_offset = parser.take(4);
+    let method_ids_size = parser.take(4);
+    let method_ids_offset = parser.take(4);
+    let class_defs_size = parser.take(4);
+    let class_defs_offset = parser.take(4);
+    let data_size = parser.take(4);
+    let data_offset = parser.take(4);
+
+    let endianness = match endian_constant.as_slice() {
+        [0x78, 0x56, 0x34, 0x12] => Endianness::LittleEndian, 
+        _ => Endianness::BigEndian,
+    };
+
+    DexHeader {
+        dex_version: 0,                     // FIXME - grab actual version from dex_file_magic
+        checksum: to_decimal(&checksum),    // FIXME - should this checksum be a decimal? hex?
+        sha1: to_hex_string(&sha1).replace(" ", ""),
+        file_size: to_decimal(&file_size),
+        header_size: to_decimal(&header_size),
+        endianness,
+        link_size: to_decimal(&link_size),
+        link_offset: to_decimal(&link_offset),
+        map_offset: to_decimal(&map_offset),
+        string_ids_size: to_decimal(&string_ids_size),
+        string_ids_offset: to_decimal(&string_ids_offset),
+        type_ids_size: to_decimal(&type_ids_size),
+        type_ids_offset: to_decimal(&type_ids_offset),
+        proto_ids_size: to_decimal(&proto_ids_size),
+        proto_ids_offset: to_decimal(&proto_ids_offset),
+        field_ids_size: to_decimal(&field_ids_size),
+        field_ids_offset: to_decimal(&field_ids_offset),
+        method_ids_size: to_decimal(&method_ids_size),
+        method_ids_offset: to_decimal(&method_ids_offset),
+        class_defs_size: to_decimal(&class_defs_size),
+        class_defs_offset: to_decimal(&class_defs_offset),
+        data_size: to_decimal(&data_size),
+        data_offset: to_decimal(&data_offset),
+    }
+}
+
+// fn parse_strings(parser: &mut BinaryParser, offset: u32, list_size: u32) -> Vec<String> {
+    
+// }
