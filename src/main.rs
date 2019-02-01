@@ -6,7 +6,8 @@ mod util;
 mod binary_parser;
 mod dex_types;
 mod dex_parser;
-use crate::dex_parser::{DexParser};
+use crate::binary_parser::BinaryParser;
+use crate::dex_parser::{parse_header, parse_class_defs};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,8 +17,8 @@ fn main() {
     let mut buf = Vec::new();
     file.read_to_end(&mut buf).unwrap();
 
-    let mut dex_parser = DexParser::new(buf);
-    dex_parser.parse();
+    let mut parser = BinaryParser::new(buf);
+    let header = parse_header(&mut parser);
+    let _strings = parse_class_defs(&mut parser, header.class_defs_offset as usize, header.class_defs_size as usize);
 
-    println!("{:?}", dex_parser.header);
 }

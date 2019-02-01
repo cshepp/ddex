@@ -1,5 +1,7 @@
+#![allow(dead_code, unused_variables)]
 
-use crate::util::{decode_uleb128, to_hex_string, to_binary_string};
+
+use crate::util::{decode_uleb128};
 
 pub struct BinaryParser {
     buffer: Vec<u8>,
@@ -18,10 +20,6 @@ impl BinaryParser {
         let x = self.buffer[self.next];
         self.next += 1;
         return x;
-    }
-
-    pub fn drop(&mut self, n: usize) {
-        self.next += n;
     }
 
     pub fn expect(&mut self, i: u8) {
@@ -73,10 +71,6 @@ impl BinaryParser {
         self.next = i;
     }
 
-    pub fn is_it_the_end(&mut self) -> bool {
-        self.next == self.buffer.len()
-    }
-
     pub fn parse_uleb128(&mut self) -> u32 {
         let mut result: Vec<u8> = Vec::new();
 
@@ -88,8 +82,6 @@ impl BinaryParser {
             }
         }
 
-        let uint = decode_uleb128(&result);
-        //println!(">>>>>>>> Parsing uLEB128: {} -> {} -> {}", to_hex_string(&result), to_binary_string(&result), uint);
-        return uint;
+        return decode_uleb128(&result);
     }
 }

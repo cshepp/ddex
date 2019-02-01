@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 #[derive(Debug)]
 pub struct DexHeader {
     pub dex_version: u8,
@@ -76,7 +78,6 @@ pub struct DexMethod {
 
 #[derive(Debug)]
 pub struct DexClassDef {
-    pub address: usize,
     pub class_idx: u32, // index into type_ids
     pub access_flags: u32,
     pub superclass_idx: u32, // index into type_ids
