@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_variables)]
-
 use crate::binary_parser::BinaryParser;
 use crate::dex_types::*;
 use crate::util::{to_decimal, to_decimal_short, to_utf8, to_hex_string};
@@ -7,9 +5,10 @@ use crate::util::{to_decimal, to_decimal_short, to_utf8, to_hex_string};
 pub fn parse_header(parser: &mut BinaryParser) -> DexHeader {
     parser.seek_to(0);
     let dex_magic = parser.take(8);
-
-    // @TODO: assert!() that dex magic makes sense
-
+    assert_eq!(dex_magic[0..3], [0x64, 0x65, 0x78]);
+    assert_eq!(dex_magic[3], 0x0a);
+    assert_eq!(dex_magic[7], 0x00);
+    let dex_version = dex_magic[4..7].to_vec();
     let checksum = parser.take(4);
     let sha1 = parser.take(20);
     let file_size = parser.take(4);
@@ -39,8 +38,8 @@ pub fn parse_header(parser: &mut BinaryParser) -> DexHeader {
     };
 
     DexHeader {
-        dex_version: 0,                     // FIXME - grab actual version from dex_file_magic
-        checksum: to_decimal(&checksum),    // FIXME - should this checksum be a decimal? hex?
+        dex_version: to_utf8(&dex_version),
+        checksum: to_decimal(&checksum),
         sha1: to_hex_string(&sha1).replace(" ", ""),
         file_size: to_decimal(&file_size),
         header_size: to_decimal(&header_size),
@@ -82,13 +81,13 @@ pub fn parse_strings(parser: &mut BinaryParser, offset: usize, list_size: usize)
     return parse_list_items(parser, offset, list_size, 4, parse_item);
 }
 
-pub fn parse_types(parser: &mut BinaryParser, offset: u32, list_size: u32, strings: Vec<String>) -> Vec<DexType> {
+pub fn parse_types(parser: &mut BinaryParser, offset: usize, list_size: usize, strings: Vec<String>) -> Vec<DexType> {
     let mut result: Vec<DexType> = Vec::new();
     let size_in_bytes = list_size * 4; // each type_id is 4 bytes
-    parser.seek_to(offset as usize);
+    parser.seek_to(offset);
     loop {
         let addr = parser.current_location();
-        if addr >= (offset + size_in_bytes) as usize {
+        if addr >= offset + size_in_bytes {
             break;
         }
 

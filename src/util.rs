@@ -1,22 +1,6 @@
-#![allow(dead_code, unused_variables)]
-
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 use std::fmt::Write;
-
-pub fn print_hex(ls: &Vec<u8>) {
-    for i in ls {
-        print!("{:01$x} ", i, 2);
-    }
-    print!("\n");
-}
-
-pub fn print_ascii(ls: &Vec<u8>) {
-    for i in ls {
-        print!("{}", *i as char);
-    }
-    print!("\n");
-}
 
 pub fn to_hex_string(ls: &Vec<u8>) -> String {
     let mut output = String::new();
@@ -26,6 +10,7 @@ pub fn to_hex_string(ls: &Vec<u8>) -> String {
     return output;
 }
 
+#[allow(dead_code)]
 pub fn to_binary_string(ls: &Vec<u8>) -> String {
     let mut output = String::new();
     for i in ls {
@@ -44,6 +29,7 @@ pub fn to_decimal_short(ls: &Vec<u8>) -> u16 {
     rdr.read_u16::<LittleEndian>().unwrap()
 }
 
+#[allow(dead_code)]
 pub fn to_ascii(ls: &Vec<u8>) -> String {
     ls.iter().map(|c| *c as char).collect()
 }

@@ -2,7 +2,7 @@
 
 #[derive(Debug)]
 pub struct DexHeader {
-    pub dex_version: u8,
+    pub dex_version: String,
     pub checksum: u32,
     pub sha1: String,
     pub file_size: u32,
