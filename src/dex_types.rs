@@ -71,9 +71,9 @@ pub struct DexField {
 
 #[derive(Debug)]
 pub struct DexMethod {
-    pub class_idx: u32, // index into Types??? dunno? Maybe ClassDefs?
-    pub proto_idx: u32, // index into Protos
-    pub name_idx: u32,  // index into Strings
+    pub class_idx: u32, // index into type_ids
+    pub proto_idx: u32, // index into proto_ids
+    pub name_idx: u32,  // index into string_ids
 }
 
 #[derive(Debug)]
@@ -94,18 +94,31 @@ pub struct DexClassDef {
 
 #[derive(Debug)]
 pub struct EncodedField {
-    pub field_idx: u32,
+    pub field_idx: u32,     // index into field_ids
     pub access_flags: u32,
 }
 
 #[derive(Debug)]
 pub struct EncodedMethod {
-    pub method_idx: u32,
+    pub method_idx: u32,    // index into method_ids
     pub access_flags: u32,
     pub code_offset: u32,
+    pub code_item: Option<CodeItem>,
 }
 
 #[derive(Debug)]
+pub struct CodeItem {
+    pub registers_size: u16,
+    pub ins_size: u16,
+    pub outs_size: u16,
+    pub tries_size: u16,
+    pub debug_info_offset: u32,
+    pub instructions_size: u32,
+    pub instructions: Vec<u8>,
+    //pub tries: Vec< // @TODO
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum ClassAccessLevel {
     Public     = 0x1,
     Private    = 0x2,

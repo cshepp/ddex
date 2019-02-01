@@ -81,7 +81,7 @@ pub fn parse_strings(parser: &mut BinaryParser, offset: usize, list_size: usize)
     return parse_list_items(parser, offset, list_size, 4, parse_item);
 }
 
-pub fn parse_types(parser: &mut BinaryParser, offset: usize, list_size: usize, strings: Vec<String>) -> Vec<DexType> {
+pub fn parse_types(parser: &mut BinaryParser, offset: usize, list_size: usize, strings: &Vec<String>) -> Vec<DexType> {
     let mut result: Vec<DexType> = Vec::new();
     let size_in_bytes = list_size * 4; // each type_id is 4 bytes
     parser.seek_to(offset);
@@ -248,31 +248,6 @@ fn parse_list_items<T>(
     return result;
 }
 
-fn parse_type_descriptor(s: String) -> TypeDescriptor {
-    match s.chars().map(|x| x.clone()).collect::<Vec<char>>().as_slice() {
-        ['V'] => TypeDescriptor::Void,
-        ['Z'] => TypeDescriptor::Boolean,
-        ['B'] => TypeDescriptor::Byte,
-        ['S'] => TypeDescriptor::Short,
-        ['C'] => TypeDescriptor::Char,
-        ['I'] => TypeDescriptor::Int,
-        ['J'] => TypeDescriptor::Long,
-        ['F'] => TypeDescriptor::Float,
-        ['D'] => TypeDescriptor::Double,
-        c if *c.first().unwrap() == '[' => {
-            let rest = c.iter().skip(1).collect::<String>();
-            let nested_descriptor = parse_type_descriptor(rest);
-            TypeDescriptor::Array(Box::new(nested_descriptor))
-        },
-        c if *c.first().unwrap() == 'L' => {
-            let mut class_name = c.iter().skip(1).collect::<String>();
-            class_name.pop(); // last char is always ';' so drop it
-            TypeDescriptor::Class(class_name)
-        }
-        _ => TypeDescriptor:: Void,
-    }
-}
-
 fn parse_encoded_fields(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedField> {
     let mut last_field_idx: Option<u32> = None;
     let mut fields: Vec<EncodedField> = Vec::new();
@@ -300,9 +275,59 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
         };
         let access_flags = p.parse_uleb128();
         let code_offset = p.parse_uleb128();
+        let mut code_item = None;
+        if code_offset != 0 {
+            let addr = p.current_location();
+            p.seek_to(code_offset as usize);
+            let registers_size = to_decimal_short(&p.take(2));
+            let ins_size = to_decimal_short(&p.take(2));
+            let outs_size = to_decimal_short(&p.take(2));
+            let tries_size = to_decimal_short(&p.take(2));
+            let debug_info_offset = to_decimal(&p.take(4));
+            let instructions_size = to_decimal(&p.take(4));
+            let instructions = p.take(instructions_size as usize);
 
-        methods.push(EncodedMethod{ method_idx, access_flags, code_offset });
+            code_item = Some(CodeItem {
+                registers_size,
+                ins_size,
+                outs_size,
+                tries_size,
+                debug_info_offset,
+                instructions_size,
+                instructions,
+            });
+
+            p.seek_to(addr);
+        }
+
+        methods.push(EncodedMethod{ method_idx, access_flags, code_offset, code_item });
         last_method_idx = Some(method_idx);
     }
+
     return methods;
+}
+
+fn parse_type_descriptor(s: String) -> TypeDescriptor {
+    match s.chars().map(|x| x.clone()).collect::<Vec<char>>().as_slice() {
+        ['V'] => TypeDescriptor::Void,
+        ['Z'] => TypeDescriptor::Boolean,
+        ['B'] => TypeDescriptor::Byte,
+        ['S'] => TypeDescriptor::Short,
+        ['C'] => TypeDescriptor::Char,
+        ['I'] => TypeDescriptor::Int,
+        ['J'] => TypeDescriptor::Long,
+        ['F'] => TypeDescriptor::Float,
+        ['D'] => TypeDescriptor::Double,
+        c if *c.first().unwrap() == '[' => {
+            let rest = c.iter().skip(1).collect::<String>();
+            let nested_descriptor = parse_type_descriptor(rest);
+            TypeDescriptor::Array(Box::new(nested_descriptor))
+        },
+        c if *c.first().unwrap() == 'L' => {
+            let mut class_name = c.iter().skip(1).collect::<String>();
+            class_name.pop(); // last char is always ';' so drop it
+            TypeDescriptor::Class(class_name)
+        }
+        _ => TypeDescriptor:: Void,
+    }
 }
