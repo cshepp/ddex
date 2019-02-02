@@ -37,5 +37,5 @@ fn main() {
         classes,
     };
 
-    printer.print_class_idx(1187);
+    printer.print_class_idx(876);
 }
