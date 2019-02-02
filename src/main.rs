@@ -7,6 +7,7 @@ mod binary_parser;
 mod dex_types;
 mod dex_parser;
 mod printer;
+mod instructions;
 use crate::binary_parser::BinaryParser;
 use crate::dex_parser::{parse_header, parse_strings, parse_types, parse_protos, parse_fields, parse_methods, parse_class_defs};
 use crate::printer::Printer;
@@ -37,5 +38,5 @@ fn main() {
         classes,
     };
 
-    printer.print_classes();
+    printer.print_class_idx(432);
 }

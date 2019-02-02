@@ -1,5 +1,6 @@
-use crate::dex_types::*;
 use std::fmt::Write;
+use crate::dex_types::*;
+use crate::util::to_hex_string;
 
 pub struct Printer {
     pub strings: Vec<String>,
@@ -57,6 +58,12 @@ impl Printer {
 
             write!(&mut result, "\t{} {} {}({}) {{\n", access_level, return_type_string, method_name, param_types).expect("");
             // code here
+            match &encoded_method.code_item {
+                Some(c) => {
+                    write!(&mut result, "\t\t{}\n", to_hex_string(&c.instructions)).expect("");
+                },
+                None => {},
+            };
             write!(&mut result, "\t}}\n").expect("");
         }
 
