@@ -28,7 +28,7 @@ fn main() {
     let methods = parse_methods(&mut parser, header.method_ids_offset as usize, header.method_ids_size as usize);
     let classes = parse_class_defs(&mut parser, header.class_defs_offset as usize, header.class_defs_size as usize);
 
-    let printer = Printer {
+    let mut printer = Printer {
         strings,
         types,
         protos,
@@ -37,5 +37,5 @@ fn main() {
         classes,
     };
 
-    printer.print_class_idx(876);
+    printer.print_classes();
 }

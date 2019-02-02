@@ -11,7 +11,13 @@ pub struct Printer {
 }
 
 impl Printer {
-    pub fn print_class_idx(self, i: usize) {
+    pub fn print_classes(&mut self) {
+        for i in 0..self.classes.len() {
+            self.print_class_idx(i);
+        }
+    }
+
+    pub fn print_class_idx(&mut self, i: usize) {
         let class = &self.classes[i];
         let class_type = &self.types[class.class_idx as usize];
         let class_name = match &class_type.parsed {
@@ -54,7 +60,7 @@ impl Printer {
             write!(&mut result, "\t}}\n").expect("");
         }
 
-        write!(&mut result, "}}").expect("");
+        write!(&mut result, "}}\n").expect("");
         print!("{}", result);
     }
 }
