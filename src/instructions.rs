@@ -227,38 +227,106 @@ pub enum Instruction {
     ConstMethodType,
 }
 
-// pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
+pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
+    let mut result: Vec<Instruction> = Vec::new();
+    let mut v = bytes;
+    loop {
+        if v.len() == 0 {
+            break;
+        }
 
-// }
+        let (i, n) = bytecode_to_instruction(&v);
+        result.push(i);
+        let x = n as usize;
+        v = v[x..].to_vec();
+    }
+
+    return result;
+}
 
 pub fn instruction_to_string(i: Instruction) -> String {
     match i {
         Instruction::Nop => "nop".to_string(),
         Instruction::Move(a, b) => format!("move v{} v{}", a, b),
+        Instruction::MoveFrom16(a, b) => format!("move/from16 v{} v{}", a, b),
         _ => "".to_string(),
     }
 }
 
 // returns instruction and # bytes consumed
-fn bytecode_to_instruction(x: Vec<u8>) -> (Instruction, u32) {
+fn bytecode_to_instruction(x: &Vec<u8>) -> (Instruction, u32) {
     match x[0] {
         0x00 => (Instruction::Nop, 1),
         0x01 => (Instruction::Move(x[1], x[2]), 3),
-        0x02 => (Instruction::MoveFrom16(x[1], to_decimal_short(&x[2..4].to_vec())), 4),
-        0x03 => (Instruction::Move16(to_decimal_short(&x[1..3].to_vec()), to_decimal_short(&x[3..5].to_vec())), 5),
+        0x02 => (Instruction::MoveFrom16(x[1], to_u16(&x[2..4])), 4),
+        0x03 => (Instruction::Move16(to_u16(&x[1..3]), to_u16(&x[3..5])), 5),
         0x04 => (Instruction::MoveWide(x[1], x[2]), 3),
-        0x05 => (Instruction::MoveWideFrom16(x[1], to_decimal_short(&x[2..4].to_vec())), 4),
-        0x06 => (Instruction::MoveWide16(to_decimal_short(&x[1..3].to_vec()), to_decimal_short(&x[3..5].to_vec())), 5),
+        0x05 => (Instruction::MoveWideFrom16(x[1], to_u16(&x[2..4])), 4),
+        0x06 => (Instruction::MoveWide16(to_u16(&x[1..3]), to_u16(&x[3..5])), 5),
+        0x07 => (Instruction::MoveObject(x[1], x[2]), 3),
+        0x08 => (Instruction::MoveObjectFrom16(x[1], to_u16(&x[2..4])), 4),
+        0x09 => (Instruction::MoveObject16(to_u16(&x[1..3]), to_u16(&x[3..5])), 5),
+        0x0a => (Instruction::MoveResult(x[1]), 2),
+        0x0b => (Instruction::MoveResultWide(x[1]), 2),
+        0x0c => (Instruction::MoveResultObject(x[1]), 2),
+        0x0d => (Instruction::MoveException(x[1]), 2),
+        0x0e => (Instruction::ReturnVoid, 1),
+        0x0f => (Instruction::Return(x[1]), 2),
+        0x10 => (Instruction::ReturnWide(x[1]), 2),
+        0x11 => (Instruction::ReturnObject(x[1]), 2),
+        //0x12 => (Instruction::Const4()) // TODO - split 1st byte into 4 bits
+        0x13 => (Instruction::Const16(x[1], to_u16(&x[2..4])), 4),
+        0x14 => (Instruction::Const(x[1], to_u32(&x[2..10])), 10),
+        0x15 => (Instruction::ConstHigh16(x[1], to_u16(&x[2..10])), 10), // TODO is this right? 2nd should be i16...
+        0x16 => (Instruction::ConstWide16(x[1], to_u16(&x[2..4])), 4),
+        0x17 => (Instruction::ConstWide32(x[1], to_u32(&x[2..10])), 10),
+        0x18 => (Instruction::ConstWide(x[1], to_u32(&x[2..18]) as u64), 18),
+        0x19 => (Instruction::ConstWideHigh16(x[1], to_u16(&x[2..18])), 18),
+        0x1a => (Instruction::ConstString(x[1], to_u16(&x[2..6])), 6),
+        0x1b => (Instruction::ConstStringJumbo(x[1], to_u32(&x[2..10])), 10),
+        0x1c => (Instruction::ConstClass(x[1], to_u16(&x[2..6])), 6),
+        0x1d => (Instruction::MonitorEnter(x[1]), 2),
+        0x1e => (Instruction::MonitorExit(x[1]), 2),
+        0x1f => (Instruction::CheckCast(x[1], to_u16(&x[2..6])), 6),
+        //0x20 => (Instruction::InstanceOf()) - again, split first byte into 4 bits
+        0x21 => (Instruction::ArrayLength(x[1], x[2]), 3),
+        0x22 => (Instruction::NewInstance(x[1], to_u16(&x[2..6])), 6),
+        0x23 => (Instruction::NewArray(x[1], x[2], to_u16(&x[3..7])), 7),
+        //0x24 => (Instruction::FilledNewArray()),
+        //0x25 => (Instruction::FilledNewArrayRange()),
+        //0x26 => (Instruction::FillArrayData(x[1], to_i32(&x[2..10])), 10),
+        0x27 => (Instruction::Throw(x[1]), 2),
+        0x28 => (Instruction::GoTo(x[1]), 2),
+
         _ => (Instruction::Nop, 1),
     }
 }
 
+fn to_u16(s: &[u8]) -> u16 {
+    to_decimal_short(&s.to_vec())
+}
+
+fn to_u32(s: &[u8]) -> u32 {
+    to_decimal(&s.to_vec())
+}
+
+fn to_i32(s: &[u8]) -> i32 {
+    0
+    // TODO
+}
+
 #[test]
 pub fn test_stuff() {
-    let bytecode = vec![0x01, 0x02, 0x03];
+    let bytecode = vec![0x02, 0x01, 0x03, 0x01];
 
-    let (instruction, n) = bytecode_to_instruction(bytecode);
-    let s = instruction_to_string(instruction);
-
-    assert_eq!(s, format!("move v2 v3"));
+    let (instruction, n) = bytecode_to_instruction(&bytecode);
+    assert_eq!(n, 4);
+    match instruction {
+        Instruction::MoveFrom16(a, b) => {
+            assert_eq!(a, 1);
+            assert_eq!(b, 259);
+        },
+        _ => panic!()
+    }
 }
+
