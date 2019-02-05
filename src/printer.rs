@@ -49,8 +49,8 @@ impl Printer {
             let return_type = &self.types[method_proto.return_type_idx as usize];
             let return_type_string = get_type_descriptor_string(&return_type.parsed);
             let param_types = method_proto.parameter_type_idx_list.iter()
-                .map(|idx: &u16| {
-                    let t = &self.types[*idx as usize].parsed;
+                .map(|idx: &TypeIndex| {
+                    let t = &self.types[*idx].parsed;
                     return get_type_descriptor_string(t);
                 })
                 .collect::<Vec<String>>()
@@ -60,7 +60,7 @@ impl Printer {
             // code here
             match &encoded_method.code_item {
                 Some(c) => {
-                    write!(&mut result, "\t\t{}\n", to_hex_string(&c.instructions)).expect("");
+                    write!(&mut result, "\t\t(@{}) {}\n", c.addr, to_hex_string(&c.instructions)).expect("");
                 },
                 None => {},
             };

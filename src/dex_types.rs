@@ -1,5 +1,12 @@
 #![allow(dead_code, unused_variables)]
 
+pub type StringIndex = usize;
+pub type TypeIndex   = usize;
+pub type ProtoIndex  = usize;
+pub type FieldIndex  = usize;
+pub type MethodIndex = usize;
+pub type ClassIndex  = usize;
+
 #[derive(Debug)]
 pub struct DexHeader {
     pub dex_version: String,
@@ -56,33 +63,33 @@ pub enum TypeDescriptor {
 
 #[derive(Debug)]
 pub struct DexProto {
-    pub shorty_idx: u32,
-    pub return_type_idx: u32,
+    pub shorty_idx: StringIndex,
+    pub return_type_idx: TypeIndex,
     pub parameters_offset: u32,
-    pub parameter_type_idx_list: Vec<u16>,
+    pub parameter_type_idx_list: Vec<TypeIndex>,
 }
 
 #[derive(Debug)]
 pub struct DexField {
-    pub class_idx: u32,
-    pub type_idx: u32,
-    pub name_idx: u32,
+    pub class_idx: ClassIndex,
+    pub type_idx: TypeIndex,
+    pub name_idx: StringIndex,
 }
 
 #[derive(Debug)]
 pub struct DexMethod {
-    pub class_idx: u32, // index into type_ids
-    pub proto_idx: u32, // index into proto_ids
-    pub name_idx: u32,  // index into string_ids
+    pub class_idx: TypeIndex,
+    pub proto_idx: ProtoIndex,
+    pub name_idx: StringIndex,
 }
 
 #[derive(Debug)]
 pub struct DexClassDef {
-    pub class_idx: u32, // index into type_ids
+    pub class_idx: TypeIndex,
     pub access_flags: u32,
-    pub superclass_idx: u32, // index into type_ids
+    pub superclass_idx: TypeIndex,
     pub interfaces_offset: u32,
-    pub source_file_idx: u32, // index into string_ids
+    pub source_file_idx: StringIndex,
     pub annotations_offset: u32,
     pub class_data_offset: u32,
     pub static_values_offset: u32,
@@ -94,13 +101,13 @@ pub struct DexClassDef {
 
 #[derive(Debug)]
 pub struct EncodedField {
-    pub field_idx: u32,     // index into field_ids
+    pub field_idx: FieldIndex,
     pub access_flags: u32,
 }
 
 #[derive(Debug)]
 pub struct EncodedMethod {
-    pub method_idx: u32,    // index into method_ids
+    pub method_idx: MethodIndex,
     pub access_flags: u32,
     pub code_offset: u32,
     pub code_item: Option<CodeItem>,
@@ -108,6 +115,7 @@ pub struct EncodedMethod {
 
 #[derive(Debug)]
 pub struct CodeItem {
+    pub addr: u32,
     pub registers_size: u16,
     pub ins_size: u16,
     pub outs_size: u16,

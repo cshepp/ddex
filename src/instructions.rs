@@ -1,4 +1,7 @@
 use crate::util::{to_decimal, to_decimal_short};
+use crate::dex_types::*;
+
+type RegisterIndex = u32;
 
 pub enum Instruction {
     Nop,
@@ -35,7 +38,7 @@ pub enum Instruction {
     CheckCast(u8, u16),
     InstanceOf(u8, u8, u16),
     ArrayLength(u8, u8),
-    NewInstance(u8, u16),
+    NewInstance(RegisterIndex, TypeIndex),
     NewArray(u8, u8, u16),
     FilledNewArray,      // TODO
     FilledNewArrayRange, // TODO
@@ -105,16 +108,16 @@ pub enum Instruction {
     SPutByte(u8, u16),
     SPutChar(u8, u16),
     SPutShort(u8, u16),
-    InvokeVirtual, // TODO vvv
-    InvokeSuper,
-    InvokeDirect,
-    InvokeStatic,
-    InvokeInterface,
-    InvokeVirtualRange,
-    InvokeSuperRange,
-    InvokeDirectRange,
-    InvokeStaticRange,
-    InvokeInterfaceRange,
+    InvokeVirtual,          // TODO 
+    InvokeSuper,            // TODO 
+    InvokeDirect,           // TODO 
+    InvokeStatic,           // TODO 
+    InvokeInterface,        // TODO 
+    InvokeVirtualRange,     // TODO 
+    InvokeSuperRange,       // TODO 
+    InvokeDirectRange,      // TODO 
+    InvokeStaticRange,      // TODO 
+    InvokeInterfaceRange,   // TODO 
     NegInt(u8, u8),
     NotInt(u8, u8),
     NegLong(u8, u8),
@@ -219,12 +222,12 @@ pub enum Instruction {
     ShlIntLit8(u8, u8, i8),
     ShrIntLit8(u8, u8, i8),
     UShrIntLit8(u8, u8, i8),
-    InvokePolymorphic,      // TODO vvv
-    InvokePolymorphicRange,
-    InvokeCustom,
-    InvokeCustomRange,
-    ConstMethodHandle,
-    ConstMethodType,
+    InvokePolymorphic,      // TODO 
+    InvokePolymorphicRange, // TODO 
+    InvokeCustom,           // TODO 
+    InvokeCustomRange,      // TODO 
+    ConstMethodHandle,      // TODO 
+    ConstMethodType,        // TODO 
 }
 
 pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
@@ -290,16 +293,31 @@ fn bytecode_to_instruction(x: &Vec<u8>) -> (Instruction, u32) {
         0x1f => (Instruction::CheckCast(x[1], to_u16(&x[2..6])), 6),
         //0x20 => (Instruction::InstanceOf()) - again, split first byte into 4 bits
         0x21 => (Instruction::ArrayLength(x[1], x[2]), 3),
-        0x22 => (Instruction::NewInstance(x[1], to_u16(&x[2..6])), 6),
+        0x22 => (Instruction::NewInstance(vA(x[1]), type_index(&x[2..6]) ), 6),
         0x23 => (Instruction::NewArray(x[1], x[2], to_u16(&x[3..7])), 7),
         //0x24 => (Instruction::FilledNewArray()),
         //0x25 => (Instruction::FilledNewArrayRange()),
         //0x26 => (Instruction::FillArrayData(x[1], to_i32(&x[2..10])), 10),
         0x27 => (Instruction::Throw(x[1]), 2),
-        0x28 => (Instruction::GoTo(x[1]), 2),
+        //0x28 => (Instruction::GoTo(x[1]), 2),
+        //0x29 => (Instruction::GoTo16(to_u16(&x[1..3])), 3),
+        //0x2a => (Instruction::GoTo32(to_u32(&x[1..9])), 9),
+        //0x2b => (Instruction::PackedSwitch(x[1], to_i32(&x[2..10])), 10),
 
         _ => (Instruction::Nop, 1),
     }
+}
+
+fn vA(v: u8) -> RegisterIndex {
+    v as RegisterIndex
+}
+
+fn vAA(v: &[u8]) -> RegisterIndex {
+    to_decimal(&v.to_vec()) as RegisterIndex
+}
+
+fn type_index(s: &[u8]) -> TypeIndex {
+    to_decimal(&s.to_vec()) as TypeIndex
 }
 
 fn to_u16(s: &[u8]) -> u16 {

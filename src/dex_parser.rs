@@ -107,18 +107,18 @@ pub fn parse_types(parser: &mut BinaryParser, offset: usize, list_size: usize, s
 
 pub fn parse_protos(parser: &mut BinaryParser, offset: usize, list_size: usize) -> Vec<DexProto> {
     let parse_item = Box::new(|p: &mut BinaryParser| {
-        let shorty_idx = to_decimal(&p.take(4));
-        let return_type_idx = to_decimal(&p.take(4));
+        let shorty_idx = to_decimal(&p.take(4)) as StringIndex;
+        let return_type_idx = to_decimal(&p.take(4)) as TypeIndex;
         let parameters_offset = to_decimal(&p.take(4));
         
-        let mut parameter_type_idx_list: Vec<u16> = Vec::new();
+        let mut parameter_type_idx_list: Vec<TypeIndex> = Vec::new();
         if parameters_offset != 0 { // offset of 0 indicates no parameter_type_idx_list
             p.seek_to(parameters_offset as usize);
             let parameter_count = to_decimal(&p.take(4));
 
             for _ in 0..parameter_count {
                 let param_idx = to_decimal_short(&p.take(2));
-                parameter_type_idx_list.push(param_idx);
+                parameter_type_idx_list.push(param_idx as TypeIndex);
             }
         }
 
@@ -141,9 +141,9 @@ pub fn parse_fields(parser: &mut BinaryParser, offset: usize, list_size: usize) 
         let name_idx = to_decimal(&p.take(4));
 
         DexField {
-            class_idx: class_idx as u32,
-            type_idx: type_idx as u32,
-            name_idx,
+            class_idx: class_idx as ClassIndex,
+            type_idx: type_idx as TypeIndex,
+            name_idx: name_idx as StringIndex,
         }
     });
 
@@ -157,9 +157,9 @@ pub fn parse_methods(parser: &mut BinaryParser, offset: usize, list_size: usize)
         let name_idx = to_decimal(&p.take(4));
 
         DexMethod {
-            class_idx: class_idx as u32,
-            proto_idx: proto_idx as u32,
-            name_idx,
+            class_idx: class_idx as ClassIndex,
+            proto_idx: proto_idx as ProtoIndex,
+            name_idx: name_idx as StringIndex,
         }
     });
 
@@ -168,11 +168,11 @@ pub fn parse_methods(parser: &mut BinaryParser, offset: usize, list_size: usize)
 
 pub fn parse_class_defs(parser: &mut BinaryParser, offset: usize, list_size: usize) -> Vec<DexClassDef> {
     let parse_item = Box::new(|p: &mut BinaryParser| {
-        let class_idx = to_decimal(&p.take(4));
+        let class_idx = to_decimal(&p.take(4)) as TypeIndex;
         let access_flags = to_decimal(&p.take(4));
-        let superclass_idx = to_decimal(&p.take(4));
+        let superclass_idx = to_decimal(&p.take(4)) as TypeIndex;
         let interfaces_offset = to_decimal(&p.take(4));
-        let source_file_idx = to_decimal(&p.take(4));
+        let source_file_idx = to_decimal(&p.take(4)) as StringIndex;
         let annotations_offset = to_decimal(&p.take(4));
         let class_data_offset = to_decimal(&p.take(4));
         let static_values_offset = to_decimal(&p.take(4));
@@ -249,17 +249,17 @@ fn parse_list_items<T>(
 }
 
 fn parse_encoded_fields(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedField> {
-    let mut last_field_idx: Option<u32> = None;
+    let mut last_field_idx: Option<FieldIndex> = None;
     let mut fields: Vec<EncodedField> = Vec::new();
     for _ in 0..list_size {
-        let field_idx_diff = p.parse_uleb128();
+        let field_idx_diff = p.parse_uleb128() as FieldIndex;
         let field_idx = match last_field_idx {
             Some(idx) => idx + field_idx_diff,
-            None => field_idx_diff,
+            None => field_idx_diff as FieldIndex,
         };
         let access_flags = p.parse_uleb128();
-        fields.push(EncodedField{ field_idx, access_flags });
-        last_field_idx = Some(field_idx);
+        fields.push(EncodedField{ field_idx: (field_idx as FieldIndex), access_flags });
+        last_field_idx = Some(field_idx as FieldIndex);
     }
     return fields;
 }
@@ -288,6 +288,7 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
             let instructions = p.take(instructions_size as usize);
 
             code_item = Some(CodeItem {
+                addr: code_offset,
                 registers_size,
                 ins_size,
                 outs_size,
@@ -300,7 +301,7 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
             p.seek_to(addr);
         }
 
-        methods.push(EncodedMethod{ method_idx, access_flags, code_offset, code_item });
+        methods.push(EncodedMethod{ method_idx: (method_idx as MethodIndex), access_flags, code_offset, code_item });
         last_method_idx = Some(method_idx);
     }
 
