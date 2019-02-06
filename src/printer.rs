@@ -1,6 +1,7 @@
 use std::fmt::Write;
 use crate::dex_types::*;
 use crate::util::to_hex_string;
+use crate::instructions::*;
 
 pub struct Printer {
     pub strings: Vec<String>,
@@ -60,6 +61,8 @@ impl Printer {
             // code here
             match &encoded_method.code_item {
                 Some(c) => {
+                    let instructions = parse_bytecode(c.instructions.clone());
+                    println!("{:?}", instructions);
                     write!(&mut result, "\t\t(@{}) {}\n", c.addr, to_hex_string(&c.instructions)).expect("");
                 },
                 None => {},
