@@ -122,8 +122,6 @@ pub struct CodeItem {
     pub tries_size: u16,
     pub debug_info_offset: u32,
     pub instructions_size: u32,
-    pub instructions: Vec<u8>,
-    //pub tries: Vec< // @TODO
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]

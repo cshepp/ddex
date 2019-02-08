@@ -2,6 +2,7 @@ use std::fmt::Write;
 use crate::dex_types::*;
 use crate::util::to_hex_string;
 use crate::instructions::*;
+use crate::binary_parser::BinaryParser;
 
 pub struct Printer {
     pub strings: Vec<String>,
@@ -10,6 +11,7 @@ pub struct Printer {
     pub fields: Vec<DexField>,
     pub methods: Vec<DexMethod>,
     pub classes: Vec<DexClassDef>,
+    pub parser: BinaryParser,
 }
 
 impl Printer {
@@ -58,12 +60,13 @@ impl Printer {
                 .join(", ");
 
             write!(&mut result, "\t{} {} {}({}) {{\n", access_level, return_type_string, method_name, param_types).expect("");
-            // code here
             match &encoded_method.code_item {
                 Some(c) => {
-                    let instructions = parse_bytecode(c.instructions.clone());
-                    println!("{:?}", instructions);
-                    write!(&mut result, "\t\t(@{}) {}\n", c.addr, to_hex_string(&c.instructions)).expect("");
+                    write!(&mut result, "\t\t// Offset: {:x}\n", c.addr);
+                    let instructions = parse_bytecode(&mut self.parser, (c.addr + 16) as usize, c.instructions_size as usize);
+                    for i in instructions {
+                        write!(&mut result, "\t\t{:?}\n", i).expect("");
+                    }
                 },
                 None => {},
             };

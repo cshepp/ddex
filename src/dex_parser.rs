@@ -285,7 +285,6 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
             let tries_size = to_decimal_short(&p.take(2));
             let debug_info_offset = to_decimal(&p.take(4));
             let instructions_size = to_decimal(&p.take(4));
-            let instructions = p.take(instructions_size as usize);
 
             code_item = Some(CodeItem {
                 addr: code_offset,
@@ -295,7 +294,6 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
                 tries_size,
                 debug_info_offset,
                 instructions_size,
-                instructions,
             });
 
             p.seek_to(addr);

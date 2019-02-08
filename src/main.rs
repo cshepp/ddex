@@ -36,7 +36,8 @@ fn main() {
         fields,
         methods,
         classes,
+        parser,
     };
 
-    printer.print_class_idx(1423);
+    printer.print_class_idx(1112);
 }

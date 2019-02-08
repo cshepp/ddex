@@ -1,5 +1,6 @@
-use crate::util::{to_decimal, to_decimal_short};
+use crate::util::{to_decimal, to_decimal_short, to_hex_string};
 use crate::dex_types::*;
+use crate::binary_parser::BinaryParser;
 
 type Register = u32;
 
@@ -110,10 +111,10 @@ pub enum Instruction {
     SPutChar(Register, FieldIndex),
     SPutShort(Register, FieldIndex),
     InvokeVirtual(Vec<Register>, MethodIndex),
-    InvokeSuper,            // TODO 
-    InvokeDirect,           // TODO 
-    InvokeStatic,           // TODO 
-    InvokeInterface,        // TODO 
+    InvokeSuper(Vec<Register>, MethodIndex),
+    InvokeDirect(Vec<Register>, MethodIndex),
+    InvokeStatic(Vec<Register>, MethodIndex),
+    InvokeInterface(Vec<Register>, MethodIndex),
     InvokeVirtualRange,     // TODO 
     InvokeSuperRange,       // TODO 
     InvokeDirectRange,      // TODO 
@@ -231,18 +232,16 @@ pub enum Instruction {
     ConstMethodType,        // TODO 
 }
 
-pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
+pub fn parse_bytecode(mut bytes: &mut BinaryParser, start: usize, instructions_count: usize) -> Vec<Instruction> {
     let mut result: Vec<Instruction> = Vec::new();
-    let mut v = bytes.clone();
+    bytes.seek_to(start);
+
     loop {
-        if v.len() == 0 {
+        if result.len() == instructions_count {
             break;
         }
 
-        //println!("A {}", v.len());
-
-        let instruction = bytecode_to_instruction(&mut v);
-        //println!("B {}", v.len());
+        let instruction = bytecode_to_instruction(&mut bytes);
         result.push(instruction);
     }
 
@@ -258,10 +257,10 @@ pub fn instruction_to_string(i: Instruction) -> String {
     }
 }
 
-fn bytecode_to_instruction(x: &mut Vec<u8>) -> Instruction {
-    let ins = x.pop().unwrap();
-    println!("INS: {}", ins);
-    match ins {
+fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
+    let ins = x.next();
+    //println!("INS: {}", to_hex_string(&vec![ins]));
+    let res = match ins {
         0x00 => Instruction::Nop,
         0x01 => Instruction::Move(vA1(x), vA2(x)),
         0x02 => Instruction::MoveFrom16(vAA(x), vAAAA(x)),
@@ -276,7 +275,7 @@ fn bytecode_to_instruction(x: &mut Vec<u8>) -> Instruction {
         0x0b => Instruction::MoveResultWide(vAA(x)),
         0x0c => Instruction::MoveResultObject(vAA(x)),
         0x0d => Instruction::MoveException(vAA(x)),
-        0x0e => Instruction::ReturnVoid,
+        0x0e => { x.take(1); Instruction::ReturnVoid},
         0x0f => Instruction::Return(vAA(x)),
         0x10 => Instruction::ReturnWide(vAA(x)),
         0x11 => Instruction::ReturnObject(vAA(x)),
@@ -366,11 +365,11 @@ fn bytecode_to_instruction(x: &mut Vec<u8>) -> Instruction {
         0x6b => Instruction::SPutByte(vAA(x), fieldAAAA(x)),
         0x6c => Instruction::SPutChar(vAA(x), fieldAAAA(x)),
         0x6d => Instruction::SPutShort(vAA(x), fieldAAAA(x)),
-        0x6e => Instruction::InvokeVirtual(args(x), methodAAAA(x)),
-        0x6f => Instruction::InvokeSuper,
-        0x70 => Instruction::InvokeDirect,
-        0x71 => Instruction::InvokeStatic,
-        0x72 => Instruction::InvokeInterface,
+        0x6e => { let (args, method) = args(x); Instruction::InvokeVirtual(args, method) }
+        0x6f => { let (args, method) = args(x); Instruction::InvokeSuper(args, method) }
+        0x70 => { let (args, method) = args(x); Instruction::InvokeDirect(args, method) }
+        0x71 => { let (args, method) = args(x); Instruction::InvokeStatic(args, method) }
+        0x72 => { let (args, method) = args(x); Instruction::InvokeInterface(args, method) }
         0x73 => Instruction::InvokeVirtualRange,
         0x74 => Instruction::InvokeSuperRange,
         0x75 => Instruction::InvokeDirectRange,
@@ -487,113 +486,122 @@ fn bytecode_to_instruction(x: &mut Vec<u8>) -> Instruction {
         0xfe => Instruction::ConstMethodHandle,
         0xff => Instruction::ConstMethodType,
         _ => Instruction::Nop,
-    }
+    };
+    //println!("{:?}", res);
+    return res;
 }
 
-fn vA1(v: &mut Vec<u8>) -> Register {
-    (v[0] & 0b00001111) as Register
+fn vA1(v: &mut BinaryParser) -> Register {
+    (v.peek(1)[0] & 0b00001111) as Register
 }
 
-fn vA2(v: &mut Vec<u8>) -> Register {
-    (v.pop().unwrap() & 0b11110000) as Register
+fn vA2(v: &mut BinaryParser) -> Register {
+    (v.next() >> 4 & 0b00001111) as Register
 }
 
-fn vAA(v: &mut Vec<u8>) -> Register {
-    v.pop().unwrap() as Register
+fn vAA(v: &mut BinaryParser) -> Register {
+    v.next() as Register
 }
 
-fn vAAAA(v: &mut Vec<u8>) -> Register {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // wat
-    to_decimal(&x) as Register
+fn vAAAA(v: &mut BinaryParser) -> Register {
+    let x = v.take(2);
+    to_decimal_short(&x) as Register
 }
 
-fn slA(v: &mut Vec<u8>) -> i32 {
-    (v.pop().unwrap() & 0b11110000) as i32
+fn slA(v: &mut BinaryParser) -> i32 {
+    (v.next() & 0b11110000) as i32
 }
 
-fn slAA(v: &mut Vec<u8>) -> i32 {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap()];
+fn slAA(v: &mut BinaryParser) -> i32 {
+    v.next() as i32
+}
+
+fn slAAAA(v: &mut BinaryParser) -> i32 {
+    let x = v.take(2);
     to_decimal_short(&x) as i32
 }
 
-fn slAAAA(v: &mut Vec<u8>) -> i32 {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()];
+fn slAAAAAAAA(v: &mut BinaryParser) -> i32 {
+    let x = v.take(4);
     to_decimal(&x) as i32
 }
 
-fn slAAAAAAAA(v: &mut Vec<u8>) -> i32 {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // lololololol
-    to_decimal(&x) as i32
-}
-
-fn slAAAA0000(v: &mut Vec<u8>) -> i32 {
+fn slAAAA0000(v: &mut BinaryParser) -> i32 {
     0 // TODO
 }
 
-fn slAAAAAAAAAAAAAAAA(v: &mut Vec<u8>) -> i64 {
+fn slAAAAAAAAAAAAAAAA(v: &mut BinaryParser) -> i64 {
     0 // TODO
 }
 
-fn slAAAA000000000000(v: &mut Vec<u8>) -> i64 {
+fn slAAAA000000000000(v: &mut BinaryParser) -> i64 {
     0 // TODO
 }
 
-fn stringAAAA(v: &mut Vec<u8>) -> StringIndex {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // wat
-    to_decimal(&x) as StringIndex
+fn stringAAAA(v: &mut BinaryParser) -> StringIndex {
+    let x = v.take(2);
+    to_decimal_short(&x) as StringIndex
 }
 
-fn stringAAAAAAAA(v: &mut Vec<u8>) -> StringIndex {
+fn stringAAAAAAAA(v: &mut BinaryParser) -> StringIndex {
     0 as StringIndex // TODO
 }
 
-fn typeAAAA(v: &mut Vec<u8>) -> TypeIndex {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // wat
-    to_decimal(&x) as TypeIndex
+fn typeAAAA(v: &mut BinaryParser) -> TypeIndex {
+    let x = v.take(2);
+    to_decimal_short(&x) as TypeIndex
 }
 
-fn fieldAAAA(v: &mut Vec<u8>) -> FieldIndex {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // wat
-    to_decimal(&x) as FieldIndex
+fn fieldAAAA(v: &mut BinaryParser) -> FieldIndex {
+    let x = v.take(2);
+    to_decimal_short(&x) as FieldIndex
 }
 
-fn methodAAAA(v: &mut Vec<u8>) -> MethodIndex {
-    let x = vec![v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap(),v.pop().unwrap()]; // wat
-    to_decimal(&x) as MethodIndex
+fn methodAAAA(v: &mut BinaryParser) -> MethodIndex {
+    let x = v.take(2);
+    to_decimal_short(&x) as MethodIndex
 }
 
-fn args(v: &mut Vec<u8>) -> Vec<u32> {
-    let arg_count = vA1(v);
-    let mut args: Vec<u32> = Vec::new();
-    
-    if arg_count == 0 {
-        let _ = v.pop();
-        return args;
-    }
+fn args(v: &mut BinaryParser) -> (Vec<Register>, MethodIndex) {
+    let first_byte = v.next();
+    let addr = v.take(2);
 
-    args.push(vA2(v));
+    let mut args: Vec<Register> = Vec::new();
+    let arg_count = first_byte >> 4 & 0b00001111;
 
-    for i in 0..(arg_count - 1) {
-        if i % 2 == 0 {
-            args.push(vA1(v));
-        } else {
-            args.push(vA2(v));
+    let mut arg_bytes = v.take(2);
+    if arg_count > 0 {
+        for i in 0..(arg_count - 1) {
+            let b = arg_bytes[0];
+            if i % 2 == 0 {
+                args.push((b & 0b00001111) as Register);
+            } else {
+                args.push((b >> 4 & 0b00001111) as Register);
+                arg_bytes.drain(0..1);
+            }
         }
     }
 
-    if (arg_count - 1) % 2 != 0 {
-        let _ = v.pop();
+    if arg_count == 1 {
+        let b = arg_bytes[0];
+        args.push((b & 0b00001111) as Register);
     }
 
-    return args;
+    if arg_count == 5 {
+        let last_arg = first_byte & 0b00001111;
+        args.push(last_arg as Register);
+    }
+
+    return (args, to_decimal_short(&addr) as MethodIndex);
 }
 
 
 #[test]
 pub fn test_stuff() {
     let mut bytecode = vec![0x01, 0x01];
+    let mut parser = BinaryParser::new(bytecode);
 
-    let instruction = bytecode_to_instruction(&mut bytecode);
+    let instruction = bytecode_to_instruction(&mut parser);
     match instruction {
         Instruction::Move(a, b) => {
             assert_eq!(a, 1);
@@ -605,19 +613,21 @@ pub fn test_stuff() {
 
 #[test]
 pub fn test_args_arity_one() {
-    let mut bytecode = vec![0x11];
+    let mut bytecode = vec![0x10, 0xff, 0xff, 0x04, 0x00];
+    let mut parser = BinaryParser::new(bytecode);
 
-    let a = args(&mut bytecode);
-    assert_eq!(a.len(), 1);
-    assert_eq!(bytecode.len(), 0);
+    let (args, i) = args(&mut parser);
+    assert_eq!(args.len(), 1);
+    assert_eq!(args[0], 4);
 }
 
 #[test]
 pub fn test_args_arity_two() {
-    let mut bytecode = vec![0x10, 0xc9, 0x3d, 0x00, 0x00];
+    let mut bytecode = vec![0x5f, 0x2c, 0x00, 0xb0, 0x5f];
+    let mut parser = BinaryParser::new(bytecode);
 
-    let a = args(&mut bytecode);
-    assert_eq!(a.len(), 1);
-    assert_eq!(a[0], 0);
+    let (args, i) = args(&mut parser);
+    assert_eq!(args.len(), 5);
+    assert_eq!(args, vec![0, 11, 15, 5, 15]);
 }
 
