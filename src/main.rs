@@ -39,5 +39,5 @@ fn main() {
         parser,
     };
 
-    printer.print_class_idx(1112);
+    printer.print_classes();
 }

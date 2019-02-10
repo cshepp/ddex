@@ -4,7 +4,7 @@ use crate::binary_parser::BinaryParser;
 
 type Register = u32;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Instruction {
     Nop,
     Move(Register, Register),
@@ -42,15 +42,15 @@ pub enum Instruction {
     ArrayLength(Register, Register),
     NewInstance(Register, TypeIndex),
     NewArray(Register, Register, TypeIndex),
-    FilledNewArray,      // TODO
-    FilledNewArrayRange, // TODO
-    FillArrayData,       // TODO
+    FilledNewArray(Vec<Register>, TypeIndex),
+    FilledNewArrayRange(Register, Register, TypeIndex),
+    FillArrayData(Register, i32),
     Throw(Register),
     GoTo(i32),
     GoTo16(i32),
     GoTo32(i32),
-    PackedSwitch,// TODO
-    SpareSwitch, // TODO
+    PackedSwitch(Register, i32),
+    SparseSwitch(Register, i32),
     CmpLFloat(Register, Register, Register),
     CmpGFloat(Register, Register, Register),
     CmpLDouble(Register, Register, Register),
@@ -115,11 +115,11 @@ pub enum Instruction {
     InvokeDirect(Vec<Register>, MethodIndex),
     InvokeStatic(Vec<Register>, MethodIndex),
     InvokeInterface(Vec<Register>, MethodIndex),
-    InvokeVirtualRange,     // TODO 
-    InvokeSuperRange,       // TODO 
-    InvokeDirectRange,      // TODO 
-    InvokeStaticRange,      // TODO 
-    InvokeInterfaceRange,   // TODO 
+    InvokeVirtualRange(Register, Register, MethodIndex), 
+    InvokeSuperRange(Register, Register, MethodIndex),
+    InvokeDirectRange(Register, Register, MethodIndex),
+    InvokeStaticRange(Register, Register, MethodIndex),
+    InvokeInterfaceRange(Register, Register, MethodIndex),
     NegInt(Register, Register),
     NotInt(Register, Register),
     NegLong(Register, Register),
@@ -230,6 +230,8 @@ pub enum Instruction {
     InvokeCustomRange,      // TODO 
     ConstMethodHandle,      // TODO 
     ConstMethodType,        // TODO 
+    Unused,
+    Stop,
 }
 
 pub fn parse_bytecode(mut bytes: &mut BinaryParser, start: usize, instructions_count: usize) -> Vec<Instruction> {
@@ -237,11 +239,14 @@ pub fn parse_bytecode(mut bytes: &mut BinaryParser, start: usize, instructions_c
     bytes.seek_to(start);
 
     loop {
-        if result.len() == instructions_count {
+        if bytes.current_location() >= start + instructions_count * 2 {
             break;
         }
 
         let instruction = bytecode_to_instruction(&mut bytes);
+        if instruction == Instruction::Stop {
+            break;
+        }
         result.push(instruction);
     }
 
@@ -259,18 +264,53 @@ pub fn instruction_to_string(i: Instruction) -> String {
 
 fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
     let ins = x.next();
-    //println!("INS: {}", to_hex_string(&vec![ins]));
+    //println!("INS: {} @ {}", to_hex_string(&vec![ins]), x.current_location() - 1);
     let res = match ins {
-        0x00 => Instruction::Nop,
+        0x00 => { 
+            match x.next() {
+                0x00 => Instruction::Nop,
+                0x01 => {
+                    let size = slAA(x);
+                    let payload = size * 2 + 4;
+                    //x.take(payload as usize);
+                    Instruction::Stop
+                }
+                0x02 => {
+                    let size = slAA(x);
+                    let payload = size * 4 + 2;
+                    //x.take(payload as usize);
+                    Instruction::Stop
+                }
+                0x03 => {
+                    // fill-array-data-payload
+                    let u = x.next() as u32;
+                    let v = x.next() as u32;
+                    let elem_width = u | (v << 8);
+
+                    let (a, b, c, d) = (x.next() as u32, x.next() as u32, x.next() as u32, x.next() as u32);
+                    let array_size = a | (b << 8) | (c << 16) | (d << 24);
+                    println!("{} {}", elem_width, array_size);
+                    let payload = (array_size as i64 * elem_width as i64) / 4;
+                    println!("fill array payload of {} bytes", payload);
+                    //x.take(payload as usize);
+
+                    if x.current_location() - 1 == 644995 {
+                        panic!("");
+                    }
+                    Instruction::Stop
+                }
+                _ => Instruction::Nop
+            }
+        },
         0x01 => Instruction::Move(vA1(x), vA2(x)),
         0x02 => Instruction::MoveFrom16(vAA(x), vAAAA(x)),
-        0x03 => Instruction::Move16(vAAAA(x), vAAAA(x)),
+        0x03 => { x.take(1); Instruction::Move16(vAAAA(x), vAAAA(x))},
         0x04 => Instruction::MoveWide(vA1(x), vA2(x)),
         0x05 => Instruction::MoveWideFrom16(vAA(x), vAAAA(x)),
-        0x06 => Instruction::MoveWide16(vAAAA(x), vAAAA(x)),
+        0x06 => { x.take(1); Instruction::MoveWide16(vAAAA(x), vAAAA(x))},
         0x07 => Instruction::MoveObject(vA1(x), vA2(x)),
         0x08 => Instruction::MoveObjectFrom16(vAA(x), vAAAA(x)),
-        0x09 => Instruction::MoveObject16(vAAAA(x), vAAAA(x)),
+        0x09 => {x.take(1); Instruction::MoveObject16(vAAAA(x), vAAAA(x))},
         0x0a => Instruction::MoveResult(vAA(x)),
         0x0b => Instruction::MoveResultWide(vAA(x)),
         0x0c => Instruction::MoveResultObject(vAA(x)),
@@ -297,15 +337,15 @@ fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
         0x21 => Instruction::ArrayLength(vA1(x), vA2(x)),
         0x22 => Instruction::NewInstance(vAA(x), typeAAAA(x)),
         0x23 => Instruction::NewArray(vA1(x), vA2(x), typeAAAA(x)),
-        0x24 => Instruction::FilledNewArray,
-        0x25 => Instruction::FilledNewArrayRange,
-        0x26 => Instruction::FillArrayData,
+        0x24 => { let (args, t) = invoke_kind(x); Instruction::FilledNewArray(args, t as TypeIndex) },
+        0x25 => { let (r1, r2, t) = invoke_kind_range(x); Instruction::FilledNewArrayRange(r1, r2, t as TypeIndex) }
+        0x26 => Instruction::FillArrayData(vAA(x), slAAAAAAAA(x)),
         0x27 => Instruction::Throw(vAA(x)),
         0x28 => Instruction::GoTo(slAA(x)),
-        0x29 => Instruction::GoTo16(slAAAA(x)),
-        0x2a => Instruction::GoTo32(slAAAAAAAA(x)),
-        0x2b => Instruction::PackedSwitch,
-        0x2c => Instruction::SpareSwitch,
+        0x29 => {x.take(1); Instruction::GoTo16(slAAAA(x))},
+        0x2a => {x.take(1); Instruction::GoTo32(slAAAAAAAA(x))},
+        0x2b => Instruction::PackedSwitch(vAA(x), slAAAAAAAA(x)),
+        0x2c => Instruction::SparseSwitch(vAA(x), slAAAAAAAA(x)),
         0x2d => Instruction::CmpLFloat(vAA(x), vAA(x), vAA(x)),
         0x2e => Instruction::CmpGFloat(vAA(x), vAA(x), vAA(x)),
         0x2f => Instruction::CmpLDouble(vAA(x), vAA(x), vAA(x)),
@@ -365,16 +405,16 @@ fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
         0x6b => Instruction::SPutByte(vAA(x), fieldAAAA(x)),
         0x6c => Instruction::SPutChar(vAA(x), fieldAAAA(x)),
         0x6d => Instruction::SPutShort(vAA(x), fieldAAAA(x)),
-        0x6e => { let (args, method) = args(x); Instruction::InvokeVirtual(args, method) }
-        0x6f => { let (args, method) = args(x); Instruction::InvokeSuper(args, method) }
-        0x70 => { let (args, method) = args(x); Instruction::InvokeDirect(args, method) }
-        0x71 => { let (args, method) = args(x); Instruction::InvokeStatic(args, method) }
-        0x72 => { let (args, method) = args(x); Instruction::InvokeInterface(args, method) }
-        0x73 => Instruction::InvokeVirtualRange,
-        0x74 => Instruction::InvokeSuperRange,
-        0x75 => Instruction::InvokeDirectRange,
-        0x76 => Instruction::InvokeStaticRange,
-        0x77 => Instruction::InvokeInterfaceRange,
+        0x6e => { let (args, method) = invoke_kind(x); Instruction::InvokeVirtual(args, method) }
+        0x6f => { let (args, method) = invoke_kind(x); Instruction::InvokeSuper(args, method) }
+        0x70 => { let (args, method) = invoke_kind(x); Instruction::InvokeDirect(args, method) }
+        0x71 => { let (args, method) = invoke_kind(x); Instruction::InvokeStatic(args, method) }
+        0x72 => { let (args, method) = invoke_kind(x); Instruction::InvokeInterface(args, method) }
+        0x74 => { let (r1, r2, method) = invoke_kind_range(x); Instruction::InvokeVirtualRange(r1, r2, method) }
+        0x75 => { let (r1, r2, method) = invoke_kind_range(x); Instruction::InvokeSuperRange(r1, r2, method) }
+        0x76 => { let (r1, r2, method) = invoke_kind_range(x); Instruction::InvokeDirectRange(r1, r2, method) }
+        0x77 => { let (r1, r2, method) = invoke_kind_range(x); Instruction::InvokeStaticRange(r1, r2, method) }
+        0x78 => { let (r1, r2, method) = invoke_kind_range(x); Instruction::InvokeInterfaceRange(r1, r2, method) }
         0x7b => Instruction::NegInt(vA1(x), vA2(x)),
         0x7c => Instruction::NotInt(vA1(x), vA2(x)),
         0x7d => Instruction::NegLong(vA1(x), vA2(x)),
@@ -485,7 +525,7 @@ fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
         0xfd => Instruction::InvokeCustomRange,
         0xfe => Instruction::ConstMethodHandle,
         0xff => Instruction::ConstMethodType,
-        _ => Instruction::Nop,
+        _ => {x.take(1); Instruction::Unused},
     };
     //println!("{:?}", res);
     return res;
@@ -562,7 +602,7 @@ fn methodAAAA(v: &mut BinaryParser) -> MethodIndex {
     to_decimal_short(&x) as MethodIndex
 }
 
-fn args(v: &mut BinaryParser) -> (Vec<Register>, MethodIndex) {
+fn invoke_kind(v: &mut BinaryParser) -> (Vec<Register>, MethodIndex) {
     let first_byte = v.next();
     let addr = v.take(2);
 
@@ -570,7 +610,7 @@ fn args(v: &mut BinaryParser) -> (Vec<Register>, MethodIndex) {
     let arg_count = first_byte >> 4 & 0b00001111;
 
     let mut arg_bytes = v.take(2);
-    if arg_count > 0 {
+    if arg_count > 0 && arg_count <= 5 {
         for i in 0..(arg_count - 1) {
             let b = arg_bytes[0];
             if i % 2 == 0 {
@@ -595,6 +635,14 @@ fn args(v: &mut BinaryParser) -> (Vec<Register>, MethodIndex) {
     return (args, to_decimal_short(&addr) as MethodIndex);
 }
 
+fn invoke_kind_range(v: &mut BinaryParser) -> (Register, Register, MethodIndex) {
+    let first_byte = v.next() as u32;
+    let method_addr = to_decimal_short(&v.take(2));
+    let start_register = to_decimal_short(&v.take(2)) as Register;
+
+    return (start_register, (start_register + first_byte - 1), method_addr as MethodIndex);
+}
+
 
 #[test]
 pub fn test_stuff() {
@@ -616,7 +664,7 @@ pub fn test_args_arity_one() {
     let mut bytecode = vec![0x10, 0xff, 0xff, 0x04, 0x00];
     let mut parser = BinaryParser::new(bytecode);
 
-    let (args, i) = args(&mut parser);
+    let (args, i) = invoke_kind(&mut parser);
     assert_eq!(args.len(), 1);
     assert_eq!(args[0], 4);
 }
@@ -626,8 +674,17 @@ pub fn test_args_arity_two() {
     let mut bytecode = vec![0x5f, 0x2c, 0x00, 0xb0, 0x5f];
     let mut parser = BinaryParser::new(bytecode);
 
-    let (args, i) = args(&mut parser);
+    let (args, i) = invoke_kind(&mut parser);
     assert_eq!(args.len(), 5);
     assert_eq!(args, vec![0, 11, 15, 5, 15]);
 }
 
+#[test]
+pub fn test_invoke_kind_range() {
+    let mut bytecode = vec![0x0a, 0x8f, 0x11, 0x04, 0x00];
+    let mut parser = BinaryParser::new(bytecode);
+
+    let (r1, r2, method) = invoke_kind_range(&mut parser);
+    assert_eq!(r1, 4);
+    assert_eq!(r2, 13);
+}
