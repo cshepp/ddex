@@ -64,9 +64,8 @@ impl Printer {
                 Some(c) => {
                     write!(&mut result, "\t\t// Offset: {:x}\n", c.addr).expect("");
                     write!(&mut result, "\t\t// Ins: {:?}\n", c.ins_size).expect("");
-                    //println!("+++++++++++ {} {}", c.addr + 16, c.addr);
-                    let instructions = parse_bytecode(&mut self.parser, (c.addr + 16) as usize, c.instructions_size as usize);
-                    for i in instructions {
+
+                    for i in c.instructions.iter() {
                         write!(&mut result, "\t\t{:?}\n", i).expect("");
                     }
                 },
