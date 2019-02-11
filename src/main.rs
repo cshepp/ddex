@@ -29,6 +29,10 @@ fn main() {
     let methods = parse_methods(&mut parser, header.method_ids_offset as usize, header.method_ids_size as usize);
     let classes = parse_class_defs(&mut parser, header.class_defs_offset as usize, header.class_defs_size as usize);
 
+    for c in classes.iter() {
+        println!("{:?}", c);
+    }
+
     let mut printer = Printer {
         strings,
         types,
@@ -39,5 +43,5 @@ fn main() {
         parser,
     };
 
-    printer.print_classes();
+    //printer.print_classes();
 }

@@ -289,9 +289,9 @@ fn bytecode_to_instruction(x: &mut BinaryParser) -> Instruction {
 
                     let (a, b, c, d) = (x.next() as u32, x.next() as u32, x.next() as u32, x.next() as u32);
                     let array_size = a | (b << 8) | (c << 16) | (d << 24);
-                    println!("{} {}", elem_width, array_size);
+                    //println!("{} {}", elem_width, array_size);
                     let payload = (array_size as i64 * elem_width as i64) / 4;
-                    println!("fill array payload of {} bytes", payload);
+                    //println!("fill array payload of {} bytes", payload);
                     //x.take(payload as usize);
 
                     if x.current_location() - 1 == 644995 {

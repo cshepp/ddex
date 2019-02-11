@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
+use crate::instructions::*;
+
 pub type StringIndex = usize;
 pub type TypeIndex   = usize;
 pub type ProtoIndex  = usize;
@@ -122,6 +124,7 @@ pub struct CodeItem {
     pub tries_size: u16,
     pub debug_info_offset: u32,
     pub instructions_size: u32,
+    pub instructions: Vec<Instruction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]

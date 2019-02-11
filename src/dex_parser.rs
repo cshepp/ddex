@@ -1,6 +1,7 @@
 use crate::binary_parser::BinaryParser;
 use crate::dex_types::*;
 use crate::util::{to_decimal, to_decimal_short, to_utf8, to_hex_string};
+use crate::instructions::parse_bytecode;
 
 pub fn parse_header(parser: &mut BinaryParser) -> DexHeader {
     parser.seek_to(0);
@@ -286,6 +287,8 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
             let debug_info_offset = to_decimal(&p.take(4));
             let instructions_size = to_decimal(&p.take(4));
 
+            let instructions = parse_bytecode(p, (code_offset + 16) as usize, instructions_size as usize);
+
             code_item = Some(CodeItem {
                 addr: code_offset,
                 registers_size,
@@ -294,6 +297,7 @@ fn parse_encoded_methods(p: &mut BinaryParser, list_size: usize) -> Vec<EncodedM
                 tries_size,
                 debug_info_offset,
                 instructions_size,
+                instructions,
             });
 
             p.seek_to(addr);
