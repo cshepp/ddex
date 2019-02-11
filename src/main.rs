@@ -2,12 +2,14 @@ use std::fs::File;
 use std::io::Read;
 use std::env;
 
-mod util;
+mod analysis;
 mod binary_parser;
-mod dex_types;
 mod dex_parser;
-mod printer;
+mod dex_types;
 mod instructions;
+mod printer;
+mod util;
+use crate::analysis::*;
 use crate::binary_parser::BinaryParser;
 use crate::dex_parser::{parse_header, parse_strings, parse_types, parse_protos, parse_fields, parse_methods, parse_class_defs};
 use crate::printer::Printer;

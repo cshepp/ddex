@@ -4,7 +4,7 @@ use crate::binary_parser::BinaryParser;
 
 type Register = u32;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     Nop,
     Move(Register, Register),
