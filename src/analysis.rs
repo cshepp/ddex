@@ -138,3 +138,26 @@ pub fn control_flow_graph(ins: &Vec<Instruction>) -> Graph<Block> {
         edges,
     };
 }
+
+
+fn walk(i: usize, edges: &Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    //println!("walking starting at {}", i);
+
+    let mut result: Vec<(usize, usize)> = Vec::new();
+    let mut connections = edges.iter().filter(|(a, b)| *a == i).map(|(a, b)| (*a, *b)).collect::<Vec<(usize, usize)>>();
+    //println!("found: {:?}" , connections);
+    result.append(&mut connections.clone());
+    for (a, b) in connections {
+        if b == i {
+            //println!("{} == {}", b, i);
+            continue;
+        }
+        //println!("walking subgraph");
+        let mut others = walk(b, edges);
+        result.append(&mut others);
+    }
+
+    //println!("returning {:?}", result);
+
+    return result;
+}

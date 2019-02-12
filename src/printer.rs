@@ -145,7 +145,7 @@ fn get_method_access_level_string(x: u32) -> String {
         .join(" ");
 }
 
-fn get_type_descriptor_string(t: &TypeDescriptor) -> String {
+pub fn get_type_descriptor_string(t: &TypeDescriptor) -> String {
     match t {
         TypeDescriptor::Void => String::from("void"),
         TypeDescriptor::Boolean => String::from("boolean"),
