@@ -12,6 +12,7 @@ mod util;
 use crate::analysis::*;
 use crate::binary_parser::BinaryParser;
 use crate::dex_parser::{parse_header, parse_strings, parse_types, parse_protos, parse_fields, parse_methods, parse_class_defs};
+use crate::instructions::Instruction;
 use crate::printer::Printer;
 
 fn main() {
@@ -41,24 +42,53 @@ fn main() {
     //     parser,
     // };
 
+    let mut instructions: Vec<Instruction> = Vec::new();
+
     for c in classes.iter() {
         for m in c.direct_methods.iter() {
             match &m.code_item {
                 Some(a) => {
-                    let g = control_flow_graph(&a.instructions);
-                    if g.nodes.len() > 1 {
-                        println!("-------------------------");
-                        for n in g.nodes {
-                            println!("{:?}", n);
-                        }
-                        println!("+++++");
-                        for e in g.edges {
-                            println!("{:?}", e);
-                        }
-                    }
+                    instructions.append(&mut a.instructions.clone());
                 },
                 None => {}
             }
         }
     }
+
+    let g = control_flow_graph(&instructions);
+
+    for e in &g.edges {
+        let b = g.edges.clone();
+        let (i, _) = e;
+        let graph = walk(*i, &b);
+
+        if graph.len() > 2 {
+            println!("-----------");
+            for n in graph {
+                println!("{:?}", n);
+            }
+        }
+    }
+}
+
+fn walk(i: usize, edges: &Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    //println!("walking starting at {}", i);
+
+    let mut result: Vec<(usize, usize)> = Vec::new();
+    let mut connections = edges.iter().filter(|(a, b)| *a == i).map(|(a, b)| (*a, *b)).collect::<Vec<(usize, usize)>>();
+    //println!("found: {:?}" , connections);
+    result.append(&mut connections.clone());
+    for (a, b) in connections {
+        if b == i {
+            //println!("{} == {}", b, i);
+            continue;
+        }
+        //println!("walking subgraph");
+        let mut others = walk(b, edges);
+        result.append(&mut others);
+    }
+
+    //println!("returning {:?}", result);
+
+    return result;
 }

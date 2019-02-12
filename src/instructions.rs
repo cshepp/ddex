@@ -1,4 +1,4 @@
-use crate::util::{to_decimal, to_decimal_short, to_hex_string};
+use crate::util::{to_decimal, to_decimal_short, to_hex_string, to_i8};
 use crate::dex_types::*;
 use crate::binary_parser::BinaryParser;
 
@@ -250,22 +250,22 @@ pub fn parse_bytecode(mut bytes: &mut BinaryParser, start: usize, instructions_c
         }
 
         let addr = bytes.current_location();
-
-        let kind = bytecode_to_instructionKind(&mut bytes);
-        if kind == InstructionKind::Stop {
-            break;
+        match bytecode_to_instruction_kind(&mut bytes) {
+            Some(kind) => {
+                result.push(Instruction{
+                    addr,
+                    kind,
+                });
+            }
+            None => break
         }
-        result.push(Instruction{
-            addr,
-            kind,
-        });
     }
 
     return result;
 }
 
-pub fn instructionKind_to_string(i: InstructionKind) -> String {
-    match i {
+pub fn instruction_to_string(i: Instruction) -> String {
+    match i.kind {
         InstructionKind::Nop => "nop".to_string(),
         InstructionKind::Move(a, b) => format!("move v{} v{}", a, b),
         InstructionKind::MoveFrom16(a, b) => format!("move/from16 v{} v{}", a, b),
@@ -273,10 +273,9 @@ pub fn instructionKind_to_string(i: InstructionKind) -> String {
     }
 }
 
-fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
+fn bytecode_to_instruction_kind(x: &mut BinaryParser) -> Option<InstructionKind> {
     let ins = x.next();
-    //println!("INS: {} @ {}", to_hex_string(&vec![ins]), x.current_location() - 1);
-    let res = match ins {
+    let res: InstructionKind = match ins {
         0x00 => { 
             match x.next() {
                 0x00 => InstructionKind::Nop,
@@ -284,13 +283,13 @@ fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
                     let size = slAA(x);
                     let payload = size * 2 + 4;
                     //x.take(payload as usize);
-                    InstructionKind::Stop
+                    return None;
                 }
                 0x02 => {
                     let size = slAA(x);
                     let payload = size * 4 + 2;
                     //x.take(payload as usize);
-                    InstructionKind::Stop
+                    return None;
                 }
                 0x03 => {
                     // fill-array-data-payload
@@ -308,7 +307,7 @@ fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
                     if x.current_location() - 1 == 644995 {
                         panic!("");
                     }
-                    InstructionKind::Stop
+                    return None;
                 }
                 _ => InstructionKind::Nop
             }
@@ -352,9 +351,13 @@ fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
         0x25 => { let (r1, r2, t) = invoke_kind_range(x); InstructionKind::FilledNewArrayRange(r1, r2, t as TypeIndex) }
         0x26 => InstructionKind::FillArrayData(vAA(x), slAAAAAAAA(x)),
         0x27 => InstructionKind::Throw(vAA(x)),
-        0x28 => InstructionKind::GoTo(slAA(x)),
-        0x29 => {x.take(1); InstructionKind::GoTo16(slAAAA(x))},
-        0x2a => {x.take(1); InstructionKind::GoTo32(slAAAAAAAA(x))},
+        0x28 => {
+            let mut offset = slAA(x);
+            if offset == 0 { offset = 1; }
+            InstructionKind::GoTo(offset * 2)
+        },
+        0x29 => {x.take(1); InstructionKind::GoTo16((slAAAA(x) as i64 * 2) as i32)},
+        0x2a => {x.take(1); InstructionKind::GoTo32((slAAAAAAAA(x) as i64 * 2) as i32)},
         0x2b => InstructionKind::PackedSwitch(vAA(x), slAAAAAAAA(x)),
         0x2c => InstructionKind::SparseSwitch(vAA(x), slAAAAAAAA(x)),
         0x2d => InstructionKind::CmpLFloat(vAA(x), vAA(x), vAA(x)),
@@ -362,18 +365,18 @@ fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
         0x2f => InstructionKind::CmpLDouble(vAA(x), vAA(x), vAA(x)),
         0x30 => InstructionKind::CmpGDouble(vAA(x), vAA(x), vAA(x)),
         0x31 => InstructionKind::CmpLong(vAA(x), vAA(x), vAA(x)),
-        0x32 => InstructionKind::IfEq(vA1(x), vA2(x), slAAAA(x)),
-        0x33 => InstructionKind::IfNe(vA1(x), vA2(x), slAAAA(x)),
-        0x34 => InstructionKind::IfLt(vA1(x), vA2(x), slAAAA(x)),
-        0x35 => InstructionKind::IfGe(vA1(x), vA2(x), slAAAA(x)),
-        0x36 => InstructionKind::IfGt(vA1(x), vA2(x), slAAAA(x)),
-        0x37 => InstructionKind::IfLe(vA1(x), vA2(x), slAAAA(x)),
-        0x38 => InstructionKind::IfEqZ(vAA(x), slAAAA(x)),
-        0x39 => InstructionKind::IfNeZ(vAA(x), slAAAA(x)),
-        0x3a => InstructionKind::IfLtZ(vAA(x), slAAAA(x)),
-        0x3b => InstructionKind::IfGeZ(vAA(x), slAAAA(x)),
-        0x3c => InstructionKind::IfGtZ(vAA(x), slAAAA(x)),
-        0x3d => InstructionKind::IfLeZ(vAA(x), slAAAA(x)),
+        0x32 => InstructionKind::IfEq(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x33 => InstructionKind::IfNe(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x34 => InstructionKind::IfLt(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x35 => InstructionKind::IfGe(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x36 => InstructionKind::IfGt(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x37 => InstructionKind::IfLe(vA1(x), vA2(x), slAAAA(x) * 2),
+        0x38 => InstructionKind::IfEqZ(vAA(x), slAAAA(x) * 2),
+        0x39 => InstructionKind::IfNeZ(vAA(x), slAAAA(x) * 2),
+        0x3a => InstructionKind::IfLtZ(vAA(x), slAAAA(x) * 2),
+        0x3b => InstructionKind::IfGeZ(vAA(x), slAAAA(x) * 2),
+        0x3c => InstructionKind::IfGtZ(vAA(x), slAAAA(x) * 2),
+        0x3d => InstructionKind::IfLeZ(vAA(x), slAAAA(x) * 2),
         0x44 => InstructionKind::AGet(vAA(x), vAA(x), vAA(x)),
         0x45 => InstructionKind::AGetWide(vAA(x), vAA(x), vAA(x)),
         0x46 => InstructionKind::AGetObject(vAA(x), vAA(x), vAA(x)),
@@ -538,8 +541,7 @@ fn bytecode_to_instructionKind(x: &mut BinaryParser) -> InstructionKind {
         0xff => InstructionKind::ConstMethodType,
         _ => {x.take(1); InstructionKind::Unused},
     };
-    //println!("{:?}", res);
-    return res;
+    return Some(res);
 }
 
 fn vA1(v: &mut BinaryParser) -> Register {
@@ -564,7 +566,8 @@ fn slA(v: &mut BinaryParser) -> i32 {
 }
 
 fn slAA(v: &mut BinaryParser) -> i32 {
-    v.next() as i32
+    let x = v.take(1);
+    to_i8(&x) as i32
 }
 
 fn slAAAA(v: &mut BinaryParser) -> i32 {
@@ -660,13 +663,18 @@ pub fn test_stuff() {
     let mut bytecode = vec![0x01, 0x01];
     let mut parser = BinaryParser::new(bytecode);
 
-    let instructionKind = bytecode_to_instructionKind(&mut parser);
-    match instructionKind {
-        InstructionKind::Move(a, b) => {
-            assert_eq!(a, 1);
-            assert_eq!(b, 0);
-        },
-        _ => panic!()
+    let instruction = bytecode_to_instruction_kind(&mut parser);
+    match instruction {
+        Some(x) => {
+            match x {
+                InstructionKind::Move(a, b) => {
+                    assert_eq!(a, 1);
+                    assert_eq!(b, 0);
+                },
+                _ => panic!()
+            }
+        }
+        None => panic!()
     }
 }
 

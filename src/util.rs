@@ -19,6 +19,11 @@ pub fn to_binary_string(ls: &Vec<u8>) -> String {
     return output;
 }
 
+pub fn to_i8(ls: &Vec<u8>) -> i8 {
+    let mut rdr = Cursor::new(ls);
+    rdr.read_i8().unwrap()
+}
+
 pub fn to_decimal(ls: &Vec<u8>) -> u32 {
     let mut rdr = Cursor::new(ls);
     rdr.read_u32::<LittleEndian>().unwrap()
