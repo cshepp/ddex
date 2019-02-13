@@ -13,6 +13,7 @@ mod printer;
 mod util;
 use crate::binary_parser::BinaryParser;
 use crate::dex_parser::{parse_header, parse_strings, parse_types, parse_protos, parse_fields, parse_methods, parse_class_defs};
+use crate::instructions::Instruction;
 use crate::printer::get_type_descriptor_string;
 
 fn main() {
@@ -31,7 +32,8 @@ fn main() {
         .subcommand(SubCommand::with_name("types")
             .about("Prints the names of the types contained within the dex file"))
         .subcommand(SubCommand::with_name("classes")
-            .about("Prints the names of the classes contained within the dex file"));
+            .about("Prints the names of the classes contained within the dex file"))
+        .subcommand(SubCommand::with_name("disassemble"));
 
     let args: Vec<String> = env::args().collect();
     let matches = match app.get_matches_from_safe_borrow(args) {
@@ -76,6 +78,27 @@ fn main() {
             for c in classes {
                 let class_name = &types[c.class_idx as usize];
                 println!("{}", get_type_descriptor_string(&class_name.parsed));
+            }
+        }
+        Some("disassemble") => {
+            let header  = parse_header(&mut parser);
+            let strings = parse_strings(&mut parser, header.string_ids_offset as usize, header.string_ids_size as usize);
+            let types   = parse_types(&mut parser, header.type_ids_offset as usize, header.type_ids_size as usize, &strings);
+            let classes = parse_class_defs(&mut parser, header.class_defs_offset as usize, header.class_defs_size as usize);
+            let mut instructions: Vec<Instruction> = Vec::new();
+            for c in classes {
+                for d in c.direct_methods {
+                    match d.code_item {
+                        Some(mut code) => {
+                            instructions.append(&mut code.instructions);
+                        }
+                        None => {}
+                    }
+                }
+            }
+
+            for i in instructions {
+                println!("{}", i);
             }
         }
         Some(_) | None => app.print_help().expect(""),

@@ -186,8 +186,7 @@ impl Display for Endianness {
 impl Display for DexHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, 
-r#"
-dex version        {}
+r#"dex version        {}
 checksum           {}
 sha1               {}
 file size          {} bytes
@@ -209,8 +208,7 @@ method IDs offset  {:#x}
 class defs size    {} bytes
 class defs offset  {:#x}
 data size          {} bytes
-data offset        {:#x}
-"#, 
+data offset        {:#x}"#, 
         self.dex_version, 
         self.checksum, 
         self.sha1, 
