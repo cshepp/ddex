@@ -1,5 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
+use std::fmt;
+use std::fmt::Display;
 use crate::instructions::*;
 
 pub type StringIndex = usize;
@@ -170,4 +172,68 @@ pub enum MethodAccessLevel {
     Synthetic            = 0x1000,
     Constructor          = 0x10000,
     DeclaredSynchronized = 0x20000,
+}
+
+impl Display for Endianness {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Endianness::LittleEndian => write!(f, "little endian"),
+            Endianness::BigEndian => write!(f, "big endian"),
+        }
+    }
+}
+
+impl Display for DexHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, 
+r#"
+dex version        {}
+checksum           {}
+sha1               {}
+file size          {} bytes
+header size        {} bytes
+endianness         {}
+link size          {} bytes
+link offset        {:#x}
+map offset         {:#x}
+string IDs size    {} bytes
+string IDs offset  {:#x}
+type IDs size      {} bytes
+type IDs offset    {:#x}
+proto IDs size     {} bytes
+proto IDs offset   {:#x}
+field IDs size     {} bytes
+field IDs offset   {:#x}
+method IDs size    {} bytes
+method IDs offset  {:#x}
+class defs size    {} bytes
+class defs offset  {:#x}
+data size          {} bytes
+data offset        {:#x}
+"#, 
+        self.dex_version, 
+        self.checksum, 
+        self.sha1, 
+        self.file_size,
+        self.header_size,
+        self.endianness,
+        self.link_size,
+        self.link_offset,
+        self.map_offset,
+        self.string_ids_size,
+        self.string_ids_offset,
+        self.type_ids_size,
+        self.type_ids_offset,
+        self.proto_ids_size,
+        self.proto_ids_offset,
+        self.field_ids_size,
+        self.field_ids_offset,
+        self.method_ids_size,
+        self.method_ids_offset,
+        self.class_defs_size,
+        self.class_defs_offset,
+        self.data_size,
+        self.data_offset
+        )
+    }
 }

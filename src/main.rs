@@ -51,7 +51,7 @@ fn main() {
     match matches.subcommand_name() {
         Some("header") => {
             let header  = parse_header(&mut parser);
-            println!("{:?}", header);
+            println!("{}", header);
         }
         Some("strings") => {
             let header  = parse_header(&mut parser);
