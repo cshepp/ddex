@@ -33,7 +33,8 @@ fn main() {
             .about("Prints the names of the types contained within the dex file"))
         .subcommand(SubCommand::with_name("classes")
             .about("Prints the names of the classes contained within the dex file"))
-        .subcommand(SubCommand::with_name("disassemble"));
+        .subcommand(SubCommand::with_name("disassemble")
+            .about("Disassembles the app and prints the results"));
 
     let args: Vec<String> = env::args().collect();
     let matches = match app.get_matches_from_safe_borrow(args) {
