@@ -1,5 +1,5 @@
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 use crate::binary_parser::BinaryParser;
 use crate::dex_types::*;
 use crate::util::{to_decimal, to_decimal_short, to_hex_string, to_i8};
@@ -10,6 +10,7 @@ type Register = u32;
 pub struct Instruction {
     pub addr: usize,
     pub kind: InstructionKind,
+    pub bytecode: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -254,9 +255,17 @@ pub fn parse_bytecode(mut bytes: &mut BinaryParser, start: usize, instructions_c
         let addr = bytes.current_location();
         match bytecode_to_instruction_kind(&mut bytes) {
             Some(kind) => {
+
+                let end_addr = bytes.current_location();
+                let diff = end_addr - addr;
+
+                bytes.seek_to(addr);
+                let bytecode = bytes.take(diff);
+
                 result.push(Instruction{
                     addr,
                     kind,
+                    bytecode,
                 });
             }
             None => break
@@ -308,9 +317,9 @@ pub fn instruction_to_string(i: &Instruction) -> String {
         InstructionKind::FilledNewArrayRange(a, b, c) => format!("filled-new-array/range {{v{}..v{}}} {:#x}", a, b, c),
         InstructionKind::FillArrayData(a, b)          => format!("fill-array-data v{} {:#x}", a, b),
         InstructionKind::Throw(a)  => format!("throw v{}", a),
-        InstructionKind::GoTo(a)   => format!("goto v{}", a),
-        InstructionKind::GoTo16(a) => format!("goto/16 v{}", a),
-        InstructionKind::GoTo32(a) => format!("goto/32 v{}", a),
+        InstructionKind::GoTo(a)   => format!("goto {}", a),
+        InstructionKind::GoTo16(a) => format!("goto/16 {}", a),
+        InstructionKind::GoTo32(a) => format!("goto/32 {}", a),
         InstructionKind::PackedSwitch(a, b) => format!("packed-switch v{} {:#x}", a, b),
         InstructionKind::SparseSwitch(a, b) => format!("sparse-switch v{} {:#x}", a, b),
         InstructionKind::CmpLFloat(a, b, c)  => format!("cmpl-float v{} v{} v{}", a, b, c),
@@ -885,6 +894,20 @@ fn invoke_kind_range(v: &mut BinaryParser) -> (Register, Register, MethodIndex) 
     return (start_register, (start_register + first_byte - 1), method_addr as MethodIndex);
 }
 
+impl Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:#x} {: <12} {}", self.addr, to_hex(&self.bytecode), instruction_to_string(self))
+    }
+}
+
+fn to_hex(ls: &Vec<u8>) -> String {
+    let mut output = String::new();
+    for i in ls {
+        write!(&mut output, "{:01$x}", i, 2).expect("Couldn't write to string.");
+    }
+    return output;
+}
+
 
 #[test]
 pub fn test_stuff() {
@@ -934,10 +957,4 @@ pub fn test_invoke_kind_range() {
     let (r1, r2, method) = invoke_kind_range(&mut parser);
     assert_eq!(r1, 4);
     assert_eq!(r2, 13);
-}
-
-impl Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:#x} {}", self.addr, instruction_to_string(self))
-    }
 }
