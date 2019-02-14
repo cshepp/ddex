@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::{Display, Write};
 use crate::binary_parser::BinaryParser;
 use crate::dex_types::*;
-use crate::util::{to_decimal, to_decimal_short, to_hex_string, to_i8};
+use crate::util::{to_decimal, to_decimal_short, to_hex_string, to_i8, to_i16};
 
 type Register = u32;
 
@@ -317,9 +317,9 @@ pub fn instruction_to_string(i: &Instruction) -> String {
         InstructionKind::FilledNewArrayRange(a, b, c) => format!("filled-new-array/range {{v{}..v{}}} {:#x}", a, b, c),
         InstructionKind::FillArrayData(a, b)          => format!("fill-array-data v{} {:#x}", a, b),
         InstructionKind::Throw(a)  => format!("throw v{}", a),
-        InstructionKind::GoTo(a)   => format!("goto {}", a),
-        InstructionKind::GoTo16(a) => format!("goto/16 {}", a),
-        InstructionKind::GoTo32(a) => format!("goto/32 {}", a),
+        InstructionKind::GoTo(a)   => format!("goto {:#x} ({})", i.addr as i32 + *a, a),
+        InstructionKind::GoTo16(a) => format!("goto/16 {:#x} ({})", i.addr as i32 + *a, a),
+        InstructionKind::GoTo32(a) => format!("goto/32 {:#x} ({})", i.addr as i32 + *a, a),
         InstructionKind::PackedSwitch(a, b) => format!("packed-switch v{} {:#x}", a, b),
         InstructionKind::SparseSwitch(a, b) => format!("sparse-switch v{} {:#x}", a, b),
         InstructionKind::CmpLFloat(a, b, c)  => format!("cmpl-float v{} v{} v{}", a, b, c),
@@ -809,7 +809,7 @@ fn slAA(v: &mut BinaryParser) -> i32 {
 
 fn slAAAA(v: &mut BinaryParser) -> i32 {
     let x = v.take(2);
-    to_decimal_short(&x) as i32
+    to_i16(&x) as i32
 }
 
 fn slAAAAAAAA(v: &mut BinaryParser) -> i32 {

@@ -24,6 +24,11 @@ pub fn to_i8(ls: &Vec<u8>) -> i8 {
     rdr.read_i8().unwrap()
 }
 
+pub fn to_i16(ls: &Vec<u8>) -> i16 {
+    let mut rdr = Cursor::new(ls);
+    rdr.read_i16::<LittleEndian>().unwrap()
+}
+
 pub fn to_decimal(ls: &Vec<u8>) -> u32 {
     let mut rdr = Cursor::new(ls);
     rdr.read_u32::<LittleEndian>().unwrap()
