@@ -1,6 +1,6 @@
 # ddex
 
-**ddex** (_pronounced dee-decks_) is a toolset for dealing with `.dex` files. Currently it can provide insight into the contents of `.dex` files, along with basic disassembly functionality.
+**ddex** (_pronounced dee-decks_) is a toolkit for dealing with `.dex` files. Currently it can provide insight into the contents of `.dex` files, along with basic disassembly functionality.
 
 ``` bash
 USAGE:
