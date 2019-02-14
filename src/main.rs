@@ -98,6 +98,8 @@ fn main() {
                 }
             }
 
+            instructions.sort_by_key(|x| x.addr);
+
             for i in instructions {
                 println!("{}", i);
             }
