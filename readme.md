@@ -4,14 +4,14 @@
 
 ``` bash
 USAGE:
-    ddex.exe <FILE> [SUBCOMMAND]
+    ddex --input <FILE> [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
-ARGS:
-    <FILE>
+OPTIONS:
+    -i, --input <FILE>
 
 SUBCOMMANDS:
     classes        Prints the names of the classes contained within the dex file
@@ -20,4 +20,9 @@ SUBCOMMANDS:
     help           Prints this message or the help of the given subcommand(s)
     strings        Prints the strings contained within the dex file
     types          Prints the names of the types contained within the dex file
+```
+
+Example:
+```bash
+ddex --input classes.dex disassemble
 ```
