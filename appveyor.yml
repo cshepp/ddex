@@ -14,8 +14,10 @@ environment:
 
 install:
   - cmd: appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
+  - cmd: rustup-init -yv --default-toolchain %channel% --default-host %target%
   - sh: curl https://sh.rustup.rs -sSf -o rustup-init
-  - rustup-init -yv --default-toolchain %channel% --default-host %target%
+  - sh: chmod +x rustup-init
+  - sh: .\rustup-init -yv --default-toolchain %channel% --default-host %target%
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
   - rustc -vV
   - cargo -vV
