@@ -19,6 +19,7 @@ install:
   - sh: curl https://sh.rustup.rs -sSf -o rustup-init
   - sh: chmod +x rustup-init
   - sh: ./rustup-init -y --default-toolchain $channel --default-host $target 
+  - sh: export PATH=$PATH:$HOME/.rustup/toolchains/$channel-$target/bin
   - sh: export PATH=$PATH:$HOME/.cargo/.bin
   - rustc -vV
   - cargo -vV
