@@ -44,13 +44,13 @@ pub enum Endianness {
     BigEndian,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DexType {
     pub raw: String,
     pub parsed: TypeDescriptor,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeDescriptor {
     Void,
     Boolean,
@@ -73,7 +73,7 @@ pub struct DexProto {
     pub parameter_type_idx_list: Vec<TypeIndex>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DexField {
     pub class_idx: ClassIndex,
     pub type_idx: TypeIndex,
@@ -117,7 +117,7 @@ pub struct EncodedMethod {
     pub code_item: Option<CodeItem>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CodeItem {
     pub addr: u32,
     pub registers_size: u16,
@@ -233,5 +233,25 @@ data offset        {:#x}"#,
         self.data_size,
         self.data_offset
         )
+    }
+}
+
+impl Display for TypeDescriptor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TypeDescriptor::Void => write!(f, "void"),
+            TypeDescriptor::Boolean => write!(f, "boolean"),
+            TypeDescriptor::Byte => write!(f, "byte"),
+            TypeDescriptor::Short => write!(f, "short"),
+            TypeDescriptor::Char => write!(f, "char"),
+            TypeDescriptor::Int => write!(f, "int"),
+            TypeDescriptor::Long => write!(f, "long"),
+            TypeDescriptor::Float => write!(f, "float"),
+            TypeDescriptor::Double => write!(f, "double"),
+            TypeDescriptor::Class(x) => write!(f, "{}", x.to_string().replace("/", ".")),
+            TypeDescriptor::Array(b) => {
+                write!(f, "{}[]", b)
+            },
+        }
     }
 }

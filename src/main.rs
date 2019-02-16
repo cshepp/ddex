@@ -8,11 +8,13 @@ mod analysis;
 mod binary_parser;
 mod dex_parser;
 mod dex_types;
+mod disassembler;
 mod instructions;
 mod printer;
 mod util;
 use crate::binary_parser::BinaryParser;
 use crate::dex_parser::{parse_header, parse_strings, parse_types, parse_protos, parse_fields, parse_methods, parse_class_defs};
+use crate::disassembler::Disassembler;
 use crate::instructions::Instruction;
 use crate::printer::get_type_descriptor_string;
 
@@ -88,10 +90,14 @@ fn main() {
             let strings = parse_strings(&mut parser, header.string_ids_offset as usize, header.string_ids_size as usize);
             let types   = parse_types(&mut parser, header.type_ids_offset as usize, header.type_ids_size as usize, &strings);
             let classes = parse_class_defs(&mut parser, header.class_defs_offset as usize, header.class_defs_size as usize);
+            let protos  = parse_protos(&mut parser, header.proto_ids_offset as usize, header.proto_ids_size as usize);
+            let fields  = parse_fields(&mut parser, header.field_ids_offset as usize, header.field_ids_size as usize);
+            let methods = parse_methods(&mut parser, header.method_ids_offset as usize, header.method_ids_size as usize);
+
             let mut instructions: Vec<Instruction> = Vec::new();
-            for c in classes {
-                for d in c.direct_methods {
-                    match d.code_item {
+            for c in classes.iter() {
+                for d in c.direct_methods.iter() {
+                    match d.code_item.clone() {
                         Some(mut code) => {
                             instructions.append(&mut code.instructions);
                         }
@@ -102,14 +108,20 @@ fn main() {
 
             instructions.sort_by_key(|x| x.addr);
 
-            for i in instructions {
-                println!("{}", i);
-            }
+            let disassembler = Disassembler {
+                strings,
+                types,
+                protos,
+                fields,
+                methods,
+                classes,
+                instructions,
+            };
+
+            disassembler.print();
         }
         Some(_) | None => app.print_help().expect(""),
     }
 
-    // let protos  = parse_protos(&mut parser, header.proto_ids_offset as usize, header.proto_ids_size as usize);
-    // let fields  = parse_fields(&mut parser, header.field_ids_offset as usize, header.field_ids_size as usize);
-    // let methods = parse_methods(&mut parser, header.method_ids_offset as usize, header.method_ids_size as usize);
+
 }
