@@ -22,7 +22,7 @@ SUBCOMMANDS:
     types          Prints the names of the types contained within the dex file
 ```
 
-### Examples:
+### Examples
 
 **header** subcommand:
 ```bash
@@ -56,13 +56,15 @@ data offset        0x12d700
 ```bash
 ddex --input classes.dex disassemble
 
-0x1ae0f8 701000ae0000 invoke-direct {v0} 0xae00
-0x1ae0fe 5b012000     iput-object v1 v0 0x20
-0x1ae102 5b022300     iput-object v2 v0 0x23
-0x1ae106 0e00         return-void
-0x1ae208 701000ae0100 invoke-direct {v1} 0xae00
-0x1ae20e 2200d118     new-instance v0 0x18d1
-0x1ae212 7010b1b10000 invoke-direct {v0} 0xb1b1
-0x1ae218 5b102a00     iput-object v0 v1 0x2a
+0x7cca8 7010c93d0000 invoke-direct {v0} 0x3dc9   ; <init>() -> void
+0x7ccae 5b022800     iput-object v2 v0 0x28      ; mExpectedEnd (android.arch.core.internal.SafeIterableMap$Entry)
+0x7ccb2 5b012900     iput-object v1 v0 0x29      ; mNext (android.arch.core.internal.SafeIterableMap$Entry)
+0x7ccb6 0e00         return-void
+0x7cd20 54002d00     iget-object v0 v0 0x2d      ; mStart (android.arch.core.internal.SafeIterableMap$Entry)
+0x7cd24 1100         return-object v0
+0x7d0c8 7010c93d0100 invoke-direct {v1} 0x3dc9   ; <init>() -> void
+0x7d0ce 22001c08     new-instance v0 0x81c       ; java.util.WeakHashMap
+0x7d0d2 7010b33f0000 invoke-direct {v0} 0x3fb3   ; <init>() -> void
+0x7d0d8 5b102b00     iput-object v0 v1 0x2b      ; mIterators (java.util.WeakHashMap)
 ...
 ```
