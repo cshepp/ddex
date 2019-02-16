@@ -24,7 +24,14 @@ install:
   - rustc -vV
   - cargo -vV
 
-build: false
-
 test_script:
   - cargo test --verbose
+
+build_script:
+  - cargo build --release
+
+after_build:
+  - cmd: 7z a ddex-%target%.zip %APPVEYOR_BUILD_FOLDER%\target\release\ddex.exe
+  - cmd: appveyor PushArtifact -Path ddex-%target%.zip -DeploymentName %target%
+  - sh: 7z a ddex-$target.zip $APPVEYOR_BUILD_FOLDER/target/release/ddex
+  - sh: appveyor PushArtifact -Path ddex-$target.zip -DeploymentName $target
